@@ -25,7 +25,7 @@ enum Subcommands {
 }
 
 fn main() -> anyhow::Result<()> {
-let args = Args::parse();
+    let args = Args::parse();
     println!("Start xtask...");
 
     match args.command {
@@ -34,7 +34,7 @@ let args = Args::parse();
         }
     }
 
-    println!("{}", "Finish xtask.");
+    println!("Finish xtask.");
 
     Ok(())
 }

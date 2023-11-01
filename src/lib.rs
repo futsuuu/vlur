@@ -6,6 +6,6 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
     #[cfg(debug_assertions)]
     exports.set("debug", true)?;
 
-exports.set("hello", "world")?;
+    exports.set("hello", "world")?;
     Ok(exports)
 }
