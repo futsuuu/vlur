@@ -1,7 +1,23 @@
-[package]
-name = "vlur"
+[workspace]
+members = [
+    "xtask",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 
+[workspace.dependencies]
+anyhow = "1.0.75"
+mlua = { version = "0.9.1", features = ["luajit"] }
+
+[package]
+name = "vlur"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
-mlua = { version = "0.9.1", features = ["luajit", "module", "macros"] }
+mlua = { workspace = true, features = ["module", "macros"] }
