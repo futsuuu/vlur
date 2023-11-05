@@ -1,9 +1,14 @@
-name: Fix
+name: Auto Fix
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "**.rs"
+      - "**.lua"
+      - ".rustfmt.toml"
+      - ".stylua.toml"
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,13 +23,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Format Rust code
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup cache for Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Fix Rust code
         run: |
           rustup component add rustfmt clippy
-          cargo clippy --package=* --fix --allow-dirty
+          cargo clippy --workspace --fix --allow-dirty
           cargo fmt
 
-      - name: Format Lua code
+      - name: Fix Lua code
         uses: JohnnyMorganz/stylua-action@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -34,4 +47,4 @@ jobs:
       - name: Auto Commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "style: apply formatter/linter changes"
+          commit_message: "chore: apply formatter/linter changes"
