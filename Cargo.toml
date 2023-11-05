@@ -21,3 +21,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 mlua = { workspace = true, features = ["module", "macros"] }
+walkdir = "2.4.0"
