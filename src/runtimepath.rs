@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use mlua::{FromLua, IntoLua, Lua};
+use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::OPT_SEP;
@@ -14,7 +15,7 @@ use crate::OPT_SEP;
 ///       |______________________|____________________________________|
 ///        path                   after_path
 /// ```
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct RuntimePath {
     path: String,
     after_path: String,
@@ -40,7 +41,7 @@ impl RuntimePath {
         }
     }
 
-    pub fn add(&mut self, path: &str, after: bool) {
+    pub fn push(&mut self, path: &str, after: bool) {
         if after {
             self.after_path.push(OPT_SEP);
             self.after_path.push_str(path);
@@ -56,7 +57,7 @@ impl RuntimePath {
     /// - `{dir}/start/*/after`
     /// - `{dir}/pack/*/start/*`
     /// - `{dir}/pack/*/start/*/after`
-    pub fn add_package(&mut self, dir: &str) {
+    pub fn push_package(&mut self, dir: &str) {
         let dir = Path::new(dir);
         if !dir.exists() {
             return;
@@ -92,7 +93,7 @@ impl RuntimePath {
                 continue;
             };
 
-            self.add(path, fname == "after");
+            self.push(path, fname == "after");
         }
     }
 }
@@ -102,6 +103,15 @@ impl std::fmt::Display for RuntimePath {
         f.write_str(&self.path)?;
         f.write_str(&self.after_path)?;
         Ok(())
+    }
+}
+
+impl std::ops::AddAssign<&RuntimePath> for RuntimePath {
+    fn add_assign(&mut self, other: &Self) {
+        *self = Self {
+            path: self.path.clone() + &other.path,
+            after_path: self.after_path.clone() + &other.after_path,
+        };
     }
 }
 
