@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{self, Path};
 
 use mlua::{FromLua, IntoLua, Lua};
 use serde::{Deserialize, Serialize};
@@ -71,15 +71,14 @@ impl RuntimePath {
                 if !entry.file_type().is_dir() {
                     return false;
                 }
-                let Some(fname) = entry.file_name().to_str() else {
+                let Ok(path) = entry.path().canonicalize() else {
                     return false;
                 };
-                match entry.depth() {
-                    1 => fname == "start" || fname == "pack",
-                    3 => fname == "start" || fname == "after",
-                    5 => fname == "after",
-                    _ => true,
-                }
+                let Ok(rel_path) = path.strip_prefix(dir) else {
+                    return false;
+                };
+                Self::package_filter(rel_path)
+
             });
 
         for entry in entries {
@@ -95,6 +94,35 @@ impl RuntimePath {
 
             self.push(path, fname == "after");
         }
+    }
+
+    fn package_filter(relative_path: &Path) -> bool {
+        let components = relative_path
+            .components()
+            .filter_map(|component| {
+                // Ignore `../`, `C:\\`, ...
+                match component {
+                    path::Component::Normal(s) => Some(s),
+                    _ => None,
+                }
+            });
+        for (i, c) in components.enumerate() {
+            let Some(c) = c.to_str() else {
+                return false;
+            };
+            let ok = match i {
+                0 => c == "start" || c == "pack",
+                1 => true,
+                2 => c == "start" || c == "after",
+                3 => true,
+                4 => c == "after",
+                _ => false,
+            };
+            if !ok {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -160,5 +188,17 @@ mod tests {
         let rtp = RuntimePath::new("/foo/bar/after,/baz/foobar/after");
         assert_eq!(rtp.path.as_str(), "");
         assert_eq!(rtp.after_path.as_str(), "/foo/bar/after,/baz/foobar/after");
+    }
+
+    #[test]
+    fn package_filter() {
+        assert!(RuntimePath::package_filter(Path::new("start/foo")));
+        assert!(RuntimePath::package_filter(Path::new("start/foo/after")));
+        assert!(RuntimePath::package_filter(Path::new("pack/pkg/start/plg")));
+        assert!(RuntimePath::package_filter(Path::new("pack/pkg/start/plg/after")));
+        assert!(!RuntimePath::package_filter(Path::new("opt/foo")));
+        assert!(!RuntimePath::package_filter(Path::new("pack/pkg/opt/plg")));
+        assert!(!RuntimePath::package_filter(Path::new("query/vim")));
+        assert!(!RuntimePath::package_filter(Path::new("pack/pkg/start/plg/after/foo/bar")));
     }
 }
