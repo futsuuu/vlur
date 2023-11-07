@@ -30,9 +30,7 @@ impl RuntimePath {
             }
             path_len += p.len() + 1;
         }
-        if path_len != 0 {
-            path_len -= 1;
-        }
+        path_len = path_len.saturating_sub(1);
 
         let (path, after_path) = rtp.split_at(path_len);
         Self {
@@ -78,7 +76,6 @@ impl RuntimePath {
                     return false;
                 };
                 Self::package_filter(rel_path)
-
             });
 
         for entry in entries {
@@ -97,15 +94,13 @@ impl RuntimePath {
     }
 
     fn package_filter(relative_path: &Path) -> bool {
-        let components = relative_path
-            .components()
-            .filter_map(|component| {
-                // Ignore `../`, `C:\\`, ...
-                match component {
-                    path::Component::Normal(s) => Some(s),
-                    _ => None,
-                }
-            });
+        let components = relative_path.components().filter_map(|component| {
+            // Ignore `../`, `C:\\`, ...
+            match component {
+                path::Component::Normal(s) => Some(s),
+                _ => None,
+            }
+        });
         for (i, c) in components.enumerate() {
             let Some(c) = c.to_str() else {
                 return false;
@@ -195,10 +190,14 @@ mod tests {
         assert!(RuntimePath::package_filter(Path::new("start/foo")));
         assert!(RuntimePath::package_filter(Path::new("start/foo/after")));
         assert!(RuntimePath::package_filter(Path::new("pack/pkg/start/plg")));
-        assert!(RuntimePath::package_filter(Path::new("pack/pkg/start/plg/after")));
+        assert!(RuntimePath::package_filter(Path::new(
+            "pack/pkg/start/plg/after"
+        )));
         assert!(!RuntimePath::package_filter(Path::new("opt/foo")));
         assert!(!RuntimePath::package_filter(Path::new("pack/pkg/opt/plg")));
         assert!(!RuntimePath::package_filter(Path::new("query/vim")));
-        assert!(!RuntimePath::package_filter(Path::new("pack/pkg/start/plg/after/foo/bar")));
+        assert!(!RuntimePath::package_filter(Path::new(
+            "pack/pkg/start/plg/after/foo/bar"
+        )));
     }
 }
