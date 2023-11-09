@@ -5,6 +5,7 @@ mod utils;
 use std::{fs, path::Path};
 
 use mlua::{lua_module, Function, Lua, Table};
+use speedy::{Readable as _, Writable as _};
 use walkdir::WalkDir;
 
 use cache::Cache;
@@ -34,12 +35,18 @@ fn setup(_lua: &Lua, nvim: Table) -> mlua::Result<()> {
         cache_dir: String,
     });
     let cache_dir = Path::new(&cache_dir);
+    let cache_file = &cache_dir.join("cache");
 
     // :set noloadplugins
     set_opt.call::<_, ()>(("loadplugins", false))?;
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
-    let mut cache = Cache::read(cache_dir).unwrap_or_default();
+    let mut cache = if let Ok(mut cache) = Cache::read_from_file(cache_file) {
+        cache.is_valid = true;
+        cache
+    } else {
+        Cache::default()
+    };
 
     let mut runtimepath: RuntimePath = get_opt.call("runtimepath")?;
 
@@ -83,7 +90,7 @@ fn setup(_lua: &Lua, nvim: Table) -> mlua::Result<()> {
 
     if !cache.is_valid {
         fs::create_dir_all(cache_dir).ok();
-        cache.write(cache_dir).ok();
+        cache.write_to_file(cache_file).ok();
     }
 
     Ok(())
