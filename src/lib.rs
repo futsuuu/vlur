@@ -2,9 +2,9 @@ mod cache;
 mod runtimepath;
 mod utils;
 
-use std::{fs, path::Path};
+use std::{env, fs, path::Path};
 
-use mlua::{lua_module, Function, Lua, Table};
+use mlua::{lua_module, Function, Lua, Table, Value};
 use speedy::{Readable as _, Writable as _};
 use walkdir::WalkDir;
 
@@ -27,7 +27,14 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
     Ok(exports)
 }
 
-fn setup(_lua: &Lua, nvim: Table) -> mlua::Result<()> {
+fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
+    expand_value!(lua.globals(), {
+        print: Function,
+    });
+    expand_value!(args, {
+        nvim: Table,
+        config: Table,
+    });
     expand_value!(nvim, {
         set_opt: Function,
         get_opt: Function,
@@ -78,10 +85,20 @@ fn setup(_lua: &Lua, nvim: Table) -> mlua::Result<()> {
 
     // Load the plugin scripts.
     if !cache.is_valid || cache.plugin_rtp != runtimepath {
+        let vimruntime = env::var_os("VIMRUNTIME").unwrap();
+        let vimruntime = Path::new(&vimruntime);
+        let default_plugins = config.get::<_, Table>("default_plugins").ok();
         let mut script = String::new();
+
         for dir in runtimepath.to_string().split(OPT_SEP) {
-            load_plugin_files(dir, &mut script);
+            let dir = Path::new(dir);
+            load_plugin_files(dir, &mut script, if dir.starts_with(&vimruntime) {
+                default_plugins.as_ref()
+            } else {
+                None
+            });
         }
+
         cache.is_valid = false;
         cache.plugin_rtp = runtimepath;
         cache.load_script = script;
@@ -100,8 +117,8 @@ fn setup(_lua: &Lua, nvim: Table) -> mlua::Result<()> {
 ///
 /// - `{dir}/plugin/**/*.vim`
 /// - `{dir}/plugin/**/*.lua`
-fn load_plugin_files(dir: &str, load_script: &mut String) {
-    let dir = Path::new(dir).join("plugin");
+fn load_plugin_files(dir: &Path, load_script: &mut String, default_plugins: Option<&Table>) {
+    let dir = dir.join("plugin");
     if !dir.exists() {
         return;
     }
@@ -110,14 +127,25 @@ fn load_plugin_files(dir: &str, load_script: &mut String) {
         .min_depth(1)
         .into_iter()
         .filter_entry(|entry| {
+            if entry.file_type().is_dir() {
+                return true;
+            }
             let Some(fname) = entry.file_name().to_str() else {
                 return false;
             };
-            if entry.file_type().is_file() {
-                fname.ends_with(".lua") || fname.ends_with(".vim")
-            } else {
-                true
+            let Some(default_plugins) = default_plugins else {
+                return fname.ends_with(".lua") || fname.ends_with(".vim");
+            };
+            let Some((stem, ext)) = fname.rsplit_once('.') else {
+                return false;
+            };
+            if ext != "lua" && ext != "vim" {
+                return false;
             }
+            if let Ok(Value::Boolean(false)) = default_plugins.get::<_, Value>(stem) {
+                return false;
+            }
+            true
         });
 
     for entry in entries {
