@@ -11,6 +11,7 @@ use walkdir::WalkDir;
 use cache::Cache;
 pub use runtimepath::RuntimePath;
 
+pub const BUILT_TIME: &str = include_str!(concat!(env!("OUT_DIR"), "/built_time"));
 /// Separator character used for Neovim options.
 pub const OPT_SEP: char = ',';
 
@@ -46,7 +47,7 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
     let mut cache = if let Ok(mut cache) = Cache::read_from_file(cache_file) {
-        cache.is_valid = true;
+        cache.is_valid = cache.built_time == BUILT_TIME;
         cache
     } else {
         Cache::default()
@@ -122,6 +123,7 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     exec.call::<_, ()>(load_script)?;
 
     if !cache.is_valid {
+        cache.built_time = BUILT_TIME;
         fs::create_dir_all(cache_dir).ok();
         cache.write_to_file(cache_file).ok();
     }

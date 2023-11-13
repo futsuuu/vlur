@@ -5,6 +5,7 @@ use crate::RuntimePath;
 
 #[derive(Readable, Writable, Default)]
 pub struct Cache<'a> {
+    pub built_time: &'a str,
     #[speedy(skip)]
     pub is_valid: bool,
     pub package: Package<'a>,
