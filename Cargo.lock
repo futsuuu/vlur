@@ -181,10 +181,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
+name = "equivalent"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+
+[[package]]
+name = "hashbrown"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f93e7192158dbcda357bdec5fb5788eebf8bbac027f3f33e719d29135ae84156"
+
+[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+
+[[package]]
+name = "indexmap"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+dependencies = [
+ "equivalent",
+ "hashbrown",
+]
 
 [[package]]
 name = "itertools"
@@ -418,9 +440,9 @@ dependencies = [
 [[package]]
 name = "speedy"
 version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7642861d1a1569b105c57008df95fb12ba648f7f90358f46e99bdfbf26729b84"
+source = "git+https://github.com/futsuuu/speedy?branch=deps/indexmap-2#061b82d703e0867bb8aec65141e9589331383fd1"
 dependencies = [
+ "indexmap",
  "memoffset",
  "speedy-derive",
 ]
@@ -428,8 +450,7 @@ dependencies = [
 [[package]]
 name = "speedy-derive"
 version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d395866cb6778625150f77a430cc0af764ce0300f6a3d3413477785fa34b6c7"
+source = "git+https://github.com/futsuuu/speedy?branch=deps/indexmap-2#061b82d703e0867bb8aec65141e9589331383fd1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -506,6 +527,7 @@ name = "vlur"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "indexmap",
  "mlua",
  "speedy",
  "walkdir",
