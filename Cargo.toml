@@ -23,7 +23,8 @@ crate-type = ["cdylib"]
 anyhow.workspace = true
 mlua = { workspace = true, features = ["module", "macros"] }
 walkdir = "2.4.0"
-speedy = "0.8.6"
+indexmap = "2.1.0"
+speedy = { git = "https://github.com/futsuuu/speedy", branch = "deps/indexmap-2", features = ["indexmap"] }
 
 [profile.release]
 lto = true

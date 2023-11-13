@@ -27,10 +27,7 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
     Ok(exports)
 }
 
-fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
-    expand_value!(lua.globals(), {
-        print: Function,
-    });
+fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     expand_value!(args, {
         nvim: Table,
         config: Table,
@@ -62,16 +59,16 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
     let packpath: String = get_opt.call("packpath")?;
 
     // Load `&packpath`.
-    if !cache.is_valid || cache.packpath != packpath {
-        let mut package_rtp = RuntimePath::default();
+    if !cache.is_valid || cache.package.packpath != packpath {
+        let mut rtp = RuntimePath::default();
         for dir in packpath.as_str().split(OPT_SEP) {
-            package_rtp.push_package(dir);
+            rtp.push_package(dir);
         }
         cache.is_valid = false;
-        cache.packpath = packpath;
-        cache.package_rtp = package_rtp;
+        cache.package.packpath = &packpath;
+        cache.package.runtimepath = rtp;
     }
-    runtimepath += &cache.package_rtp;
+    runtimepath += &cache.package.runtimepath;
 
     // Current `&runtimepath`:
     //
@@ -83,27 +80,46 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
     // Update `&runtimepath`.
     set_opt.call::<_, ()>(("runtimepath", runtimepath.clone()))?;
 
+    let vimruntime = env::var_os("VIMRUNTIME").unwrap();
+    let vimruntime = Path::new(&vimruntime);
+    let plugins_filter = config.get::<_, Table>("default_plugins").ok();
+    let mut load_script = String::new();
+
     // Load the plugin scripts.
-    if !cache.is_valid || cache.plugin_rtp != runtimepath {
-        let vimruntime = env::var_os("VIMRUNTIME").unwrap();
-        let vimruntime = Path::new(&vimruntime);
-        let default_plugins = config.get::<_, Table>("default_plugins").ok();
-        let mut script = String::new();
+    let rtp = runtimepath.to_string();
+    for dir in rtp.split(OPT_SEP) {
+        let path = Path::new(dir);
+        let plugins_filter = if path.starts_with(vimruntime) {
+            plugins_filter.as_ref()
+        } else {
+            None
+        };
 
-        for dir in runtimepath.to_string().split(OPT_SEP) {
-            let dir = Path::new(dir);
-            load_plugin_files(dir, &mut script, if dir.starts_with(&vimruntime) {
-                default_plugins.as_ref()
+        let plugin_files =
+            if let (true, Some(files)) = (cache.is_valid, cache.plugins.get(dir)) {
+                files
             } else {
-                None
-            });
-        }
+                let files = get_plugin_files(path);
+                cache.is_valid = false;
+                cache.plugins.insert(dir, files);
+                cache.plugins.get(dir).unwrap()
+            };
 
-        cache.is_valid = false;
-        cache.plugin_rtp = runtimepath;
-        cache.load_script = script;
+        for file in plugin_files {
+            if let Some(plugins_filter) = plugins_filter {
+                if let Ok(Value::Boolean(false)) =
+                    plugins_filter.get::<_, Value>(file.stem.as_str())
+                {
+                    continue;
+                };
+            }
+            match &file.loader {
+                cache::FileLoader::Script(command) => load_script += &command,
+            }
+        }
     }
-    exec.call::<_, ()>(cache.load_script.clone())?;
+
+    exec.call::<_, ()>(load_script)?;
 
     if !cache.is_valid {
         fs::create_dir_all(cache_dir).ok();
@@ -117,10 +133,10 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
 ///
 /// - `{dir}/plugin/**/*.vim`
 /// - `{dir}/plugin/**/*.lua`
-fn load_plugin_files(dir: &Path, load_script: &mut String, default_plugins: Option<&Table>) {
+fn get_plugin_files(dir: &Path) -> Vec<cache::File> {
     let dir = dir.join("plugin");
     if !dir.exists() {
-        return;
+        return Vec::new();
     }
 
     let entries = WalkDir::new(dir)
@@ -130,33 +146,25 @@ fn load_plugin_files(dir: &Path, load_script: &mut String, default_plugins: Opti
             if entry.file_type().is_dir() {
                 return true;
             }
-            let Some(fname) = entry.file_name().to_str() else {
+            if entry.path().to_str().is_none() {
                 return false;
             };
-            let Some(default_plugins) = default_plugins else {
-                return fname.ends_with(".lua") || fname.ends_with(".vim");
-            };
-            let Some((stem, ext)) = fname.rsplit_once('.') else {
-                return false;
-            };
-            if ext != "lua" && ext != "vim" {
-                return false;
-            }
-            if let Ok(Value::Boolean(false)) = default_plugins.get::<_, Value>(stem) {
-                return false;
-            }
             true
         });
+
+    let mut r = Vec::new();
 
     for entry in entries {
         let Ok(entry) = entry else {
             continue;
         };
-        let Some(path) = entry.path().to_str() else {
-            continue;
-        };
+        let path = entry.path();
+        let stem = path.file_stem().unwrap().to_str().unwrap().to_string();
+        let loader =
+            cache::FileLoader::Script(format!("source {}\n", path.to_str().unwrap()));
 
-        *load_script += "\nsource ";
-        *load_script += path;
+        r.push(cache::File { stem, loader });
     }
+
+    r
 }
