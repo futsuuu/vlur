@@ -41,25 +41,22 @@ macro_rules! cache {
 
 impl<'lua> Nvim<'_> {
     pub fn set_opt<A: IntoLuaMulti<'lua>>(
-        self: &'lua mut Self,
+        &'lua mut self,
         name: &str,
         value: A,
     ) -> Result<()> {
         cache!(self.set_opt: Function).call::<_, ()>((name, value))
     }
 
-    pub fn get_opt<R: FromLuaMulti<'lua>>(
-        self: &'lua mut Self,
-        name: &str,
-    ) -> Result<R> {
+    pub fn get_opt<R: FromLuaMulti<'lua>>(&'lua mut self, name: &str) -> Result<R> {
         cache!(self.get_opt: Function).call::<_, R>(name)
     }
 
-    pub fn exec<A: IntoLuaMulti<'lua>>(self: &'lua mut Self, script: A) -> Result<()> {
+    pub fn exec<A: IntoLuaMulti<'lua>>(&'lua mut self, script: A) -> Result<()> {
         cache!(self.exec: Function).call::<_, ()>(script)
     }
 
-    pub fn cache_dir(self: &'lua mut Self) -> Result<PathBuf> {
+    pub fn cache_dir(&'lua mut self) -> Result<PathBuf> {
         Ok(PathBuf::from(cache!(self.cache_dir: String)))
     }
 }
