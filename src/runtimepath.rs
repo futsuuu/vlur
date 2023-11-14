@@ -1,7 +1,7 @@
 use std::path::{self, Path};
 
 use mlua::{FromLua, IntoLua, Lua};
-use speedy::{Readable, Writable};
+use rkyv::{Archive, Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::OPT_SEP;
@@ -15,7 +15,8 @@ use crate::OPT_SEP;
 ///       |______________________|____________________________________|
 ///        path                   after_path
 /// ```
-#[derive(Readable, Writable, Default, Clone, PartialEq)]
+#[derive(Archive, Deserialize, Serialize, Clone, Default)]
+#[archive()]
 pub struct RuntimePath {
     path: String,
     after_path: String,

@@ -1,32 +1,58 @@
-use indexmap::IndexMap;
-use speedy::{Readable, Writable};
+use std::{fs, path::Path};
 
-use crate::RuntimePath;
+use hashbrown::HashMap;
+use rkyv::{Archive, Deserialize, Serialize};
 
-#[derive(Readable, Writable, Default)]
-pub struct Cache<'a> {
-    pub built_time: &'a str,
-    #[speedy(skip)]
+use crate::{RuntimePath, BUILT_TIME};
+
+#[derive(Default)]
+pub struct Cache {
     pub is_valid: bool,
-    pub package: Package<'a>,
-    pub plugins: IndexMap<&'a str, Vec<File>>,
+    pub inner: Inner,
 }
 
-#[derive(Readable, Writable, Default)]
-pub struct Package<'a> {
+impl Cache {
+    pub fn read(path: &Path) -> anyhow::Result<Self> {
+        let bytes = fs::read(path)?;
+        let inner: Inner = unsafe { rkyv::from_bytes_unchecked(&bytes)? };
+        Ok(Self {
+            is_valid: inner.built_time == BUILT_TIME,
+            inner,
+        })
+    }
+    pub fn write(&self, path: &Path) -> anyhow::Result<()> {
+        let bytes = rkyv::to_bytes::<_, 0>(&self.inner)?;
+        fs::write(path, bytes)?;
+        Ok(())
+    }
+}
+
+#[derive(Archive, Deserialize, Serialize, Default)]
+#[archive()]
+pub struct Inner {
+    pub built_time: String,
+    pub package: Package,
+    pub plugins: HashMap<String, Vec<File>>,
+}
+
+#[derive(Archive, Deserialize, Serialize, Default)]
+#[archive()]
+pub struct Package {
     // key
-    pub packpath: &'a str,
+    pub packpath: String,
     // value
     pub runtimepath: RuntimePath,
 }
 
-#[derive(Readable, Writable, Default)]
+#[derive(Archive, Deserialize, Serialize, Default)]
+#[archive()]
 pub struct File {
     pub stem: String,
     pub loader: FileLoader,
 }
 
-#[derive(Readable, Writable)]
+#[derive(Archive, Deserialize, Serialize)]
+#[archive()]
 pub enum FileLoader {
     // `source <path>`
     Script(String),

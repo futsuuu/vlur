@@ -6,7 +6,6 @@ mod utils;
 use std::{env, fs, path::Path};
 
 use mlua::{lua_module, Lua, Table, Value};
-use speedy::{Readable as _, Writable as _};
 use walkdir::WalkDir;
 
 use cache::Cache;
@@ -45,12 +44,7 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     nvim.set_opt("loadplugins", false)?;
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
-    let mut cache = if let Ok(mut cache) = Cache::read_from_file(cache_file) {
-        cache.is_valid = cache.built_time == BUILT_TIME;
-        cache
-    } else {
-        Cache::default()
-    };
+    let mut cache = Cache::read(cache_file).unwrap_or_default();
 
     let mut runtimepath: RuntimePath = nvim.get_opt("runtimepath")?;
 
@@ -59,16 +53,16 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     let packpath: String = nvim.get_opt("packpath")?;
 
     // Load `&packpath`.
-    if !cache.is_valid || cache.package.packpath != packpath {
+    if !cache.is_valid || cache.inner.package.packpath != packpath {
         let mut rtp = RuntimePath::default();
         for dir in packpath.as_str().split(OPT_SEP) {
             rtp.push_package(dir);
         }
         cache.is_valid = false;
-        cache.package.packpath = &packpath;
-        cache.package.runtimepath = rtp;
+        cache.inner.package.packpath = packpath;
+        cache.inner.package.runtimepath = rtp;
     }
-    runtimepath += &cache.package.runtimepath;
+    runtimepath += &cache.inner.package.runtimepath;
 
     // Current `&runtimepath`:
     //
@@ -95,15 +89,16 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
             None
         };
 
-        let plugin_files =
-            if let (true, Some(files)) = (cache.is_valid, cache.plugins.get(dir)) {
-                files
-            } else {
-                let files = get_plugin_files(path);
-                cache.is_valid = false;
-                cache.plugins.insert(dir, files);
-                cache.plugins.get(dir).unwrap()
-            };
+        let plugin_files = if let (true, Some(files)) =
+            (cache.is_valid, cache.inner.plugins.get(dir))
+        {
+            files
+        } else {
+            let files = get_plugin_files(path);
+            cache.is_valid = false;
+            cache.inner.plugins.insert(dir.to_string(), files);
+            cache.inner.plugins.get(dir).unwrap()
+        };
 
         for file in plugin_files {
             if let Some(plugins_filter) = plugins_filter {
@@ -122,9 +117,9 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     nvim.exec(load_script)?;
 
     if !cache.is_valid {
-        cache.built_time = BUILT_TIME;
+        cache.inner.built_time = BUILT_TIME.to_string();
         fs::create_dir_all(cache_dir).ok();
-        cache.write_to_file(cache_file).ok();
+        cache.write(cache_file).ok();
     }
 
     Ok(())
