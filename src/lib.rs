@@ -1,15 +1,18 @@
 mod cache;
+mod nvim;
 mod runtimepath;
 mod utils;
 
 use std::{env, fs, path::Path};
 
-use mlua::{lua_module, Function, Lua, Table, Value};
+use mlua::{lua_module, Lua, Table, Value};
 use speedy::{Readable as _, Writable as _};
 use walkdir::WalkDir;
 
 use cache::Cache;
+use nvim::Nvim;
 pub use runtimepath::RuntimePath;
+use utils::expand_value;
 
 pub const BUILT_TIME: &str = include_str!(concat!(env!("OUT_DIR"), "/built_time"));
 /// Separator character used for Neovim options.
@@ -30,20 +33,16 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
 
 fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     expand_value!(args, {
-        nvim: Table,
         config: Table,
     });
-    expand_value!(nvim, {
-        set_opt: Function,
-        get_opt: Function,
-        exec: Function,
-        cache_dir: String,
+    expand_value!(args, mut {
+        nvim: Nvim,
     });
-    let cache_dir = Path::new(&cache_dir);
+    let cache_dir = nvim.cache_dir()?;
     let cache_file = &cache_dir.join("cache");
 
     // :set noloadplugins
-    set_opt.call::<_, ()>(("loadplugins", false))?;
+    nvim.set_opt("loadplugins", false)?;
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
     let mut cache = if let Ok(mut cache) = Cache::read_from_file(cache_file) {
@@ -53,11 +52,11 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
         Cache::default()
     };
 
-    let mut runtimepath: RuntimePath = get_opt.call("runtimepath")?;
+    let mut runtimepath: RuntimePath = nvim.get_opt("runtimepath")?;
 
     // TODO: Load user plugins
 
-    let packpath: String = get_opt.call("packpath")?;
+    let packpath: String = nvim.get_opt("packpath")?;
 
     // Load `&packpath`.
     if !cache.is_valid || cache.package.packpath != packpath {
@@ -79,7 +78,7 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     // 4. after plugins in start packages
 
     // Update `&runtimepath`.
-    set_opt.call::<_, ()>(("runtimepath", runtimepath.clone()))?;
+    nvim.set_opt("runtimepath", runtimepath.clone())?;
 
     let vimruntime = env::var_os("VIMRUNTIME").unwrap();
     let vimruntime = Path::new(&vimruntime);
@@ -120,7 +119,7 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
         }
     }
 
-    exec.call::<_, ()>(load_script)?;
+    nvim.exec(load_script)?;
 
     if !cache.is_valid {
         cache.built_time = BUILT_TIME;
