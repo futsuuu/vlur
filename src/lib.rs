@@ -49,6 +49,9 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
 
     let mut runtimepath: RuntimePath = nvim.get_opt("runtimepath")?;
 
+    if plugins.raw_len() != cache.inner.runtimepaths.len() {
+        cache.is_valid = false;
+    }
     for plugin in plugins.sequence_values::<Table>() {
         let Ok(plugin) = plugin else {
             continue;
@@ -156,8 +159,12 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
 
     if !cache.is_valid {
         cache.inner.built_time = BUILT_TIME.to_string();
-        fs::create_dir_all(cache_dir).ok();
-        cache.write(cache_file).ok();
+        if cache_file.exists() {
+            fs::remove_file(cache_file).ok();
+        } else {
+            fs::create_dir_all(cache_dir).ok();
+            cache.write(cache_file).ok();
+        }
     }
 
     Ok(())

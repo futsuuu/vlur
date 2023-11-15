@@ -31,17 +31,25 @@ impl Cache {
 #[archive()]
 pub struct Inner {
     pub built_time: String,
+
+    /// [`RuntimePath`] added by `&packpath`.
     pub package: Package,
+
+    /// The key is the path to the plugin's directory,
+    /// and the value is the directory under that directory
+    /// to add to `&runtimepath`.
     pub runtimepaths: HashMap<String, RuntimePath>,
+
+    /// All Vim script/Lua files under the `{rtp}/plugin/` directory.
     pub plugins: HashMap<String, Vec<File>>,
 }
 
 #[derive(Archive, Deserialize, Serialize, Default)]
 #[archive()]
 pub struct Package {
-    // key
+    // cache key
     pub packpath: String,
-    // value
+    // cache value
     pub runtimepath: RuntimePath,
 }
 
