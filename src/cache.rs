@@ -32,6 +32,7 @@ impl Cache {
 pub struct Inner {
     pub built_time: String,
     pub package: Package,
+    pub runtimepaths: HashMap<String, RuntimePath>,
     pub plugins: HashMap<String, Vec<File>>,
 }
 

@@ -32,6 +32,7 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
 
 fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     expand_value!(args, {
+        plugins: Table,
         config: Table,
     });
     expand_value!(args, mut {
@@ -48,7 +49,42 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
 
     let mut runtimepath: RuntimePath = nvim.get_opt("runtimepath")?;
 
-    // TODO: Load user plugins
+    for plugin in plugins.sequence_values::<Table>() {
+        let Ok(plugin) = plugin else {
+            continue;
+        };
+        expand_value!(plugin, {
+            path: String,
+        });
+
+        let cache_key = &path;
+
+        if let (true, Some(rtp)) = (cache.is_valid, cache.inner.runtimepaths.get(cache_key))
+        {
+            runtimepath += &rtp;
+            continue;
+        }
+
+        let mut rtp = RuntimePath::default();
+
+        let path = Path::new(&path);
+        if path.exists() {
+            rtp.push(path.to_str().unwrap(), false);
+
+            let after_path = path.join("after");
+            if after_path.exists() {
+                rtp.push(after_path.to_str().unwrap(), true);
+            }
+        }
+
+        runtimepath += &rtp;
+
+        cache.is_valid = false;
+        cache
+            .inner
+            .runtimepaths
+            .insert(cache_key.to_string(), rtp);
+    }
 
     let packpath: String = nvim.get_opt("packpath")?;
 
@@ -67,9 +103,11 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
     // Current `&runtimepath`:
     //
     // 1. plugins in `&runtimepath`
-    // 2. plugins in start packages
-    // 3. after plugins in `&runtimepath`
-    // 4. after plugins in start packages
+    // 2. plugins specified by user
+    // 3. plugins in start packages
+    // 4. after plugins in `&runtimepath`
+    // 5. after plugins specified by user
+    // 6. after plugins in start packages
 
     // Update `&runtimepath`.
     nvim.set_opt("runtimepath", runtimepath.clone())?;

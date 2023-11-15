@@ -4,7 +4,7 @@ local utils = require 'vlur.utils'
 ---@class vlur
 local M = {}
 
-function M.setup(config)
+function M.setup(plugins, config)
     local lib = utils.loadlib 'vlur'
     if lib.debug then
         M._lib = lib
@@ -12,6 +12,7 @@ function M.setup(config)
 
     local args = {}
     args.nvim = nvim
+    args.plugins = plugins or {}
     args.config = config or {}
 
     lib.setup(args)
