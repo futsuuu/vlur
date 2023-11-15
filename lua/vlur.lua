@@ -1,4 +1,3 @@
-local nvim = require 'vlur.nvim'
 local utils = require 'vlur.utils'
 
 ---@class vlur
@@ -11,7 +10,6 @@ function M.setup(plugins, config)
     end
 
     local args = {}
-    args.nvim = nvim
     args.plugins = plugins or {}
     args.config = config or {}
 

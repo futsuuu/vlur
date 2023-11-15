@@ -4,10 +4,5 @@ macro_rules! expand_value {
             let $name: $ty = $gettable.get(stringify!($name))?;
         )+
     );
-    ($gettable:expr, mut { $( $name:ident : $ty:ty ),+ $(,)? }) => (
-        $(
-            let mut $name: $ty = $gettable.get(stringify!($name))?;
-        )+
-    );
 }
 pub(crate) use expand_value;

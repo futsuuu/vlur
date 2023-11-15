@@ -30,14 +30,12 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
     Ok(exports)
 }
 
-fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
+fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
     expand_value!(args, {
         plugins: Table,
         config: Table,
     });
-    expand_value!(args, mut {
-        nvim: Nvim,
-    });
+    let mut nvim = Nvim::new(lua)?;
     let cache_dir = nvim.cache_dir()?;
     let cache_file = &cache_dir.join("cache");
 
@@ -62,7 +60,8 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
 
         let cache_key = &path;
 
-        if let (true, Some(rtp)) = (cache.is_valid, cache.inner.runtimepaths.get(cache_key))
+        if let (true, Some(rtp)) =
+            (cache.is_valid, cache.inner.runtimepaths.get(cache_key))
         {
             runtimepath += &rtp;
             continue;
@@ -83,10 +82,7 @@ fn setup(_lua: &Lua, args: Table) -> mlua::Result<()> {
         runtimepath += &rtp;
 
         cache.is_valid = false;
-        cache
-            .inner
-            .runtimepaths
-            .insert(cache_key.to_string(), rtp);
+        cache.inner.runtimepaths.insert(cache_key.to_string(), rtp);
     }
 
     let packpath: String = nvim.get_opt("packpath")?;

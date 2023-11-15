@@ -26,6 +26,10 @@ walkdir = "2.4.0"
 hashbrown = { version = "0.14.2", features = ["rkyv"] }
 rkyv = "0.7.42"
 
+[build-dependencies]
+anyhow.workspace = true
+mlua = { workspace = true, features = ["vendored"] }
+
 [profile.release]
 lto = true
 codegen-units = 1
