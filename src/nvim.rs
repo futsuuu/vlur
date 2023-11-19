@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use mlua::{
-    ChunkMode, FromLua, FromLuaMulti, Function, IntoLuaMulti, Lua, Result, Table,
+    ChunkMode, FromLuaMulti, Function, IntoLuaMulti, Lua, Result,
+    Table,
 };
 
 pub struct Nvim<'lua> {
@@ -17,20 +18,10 @@ struct Cache<'lua> {
     cache_dir: Option<String>,
 }
 
-impl<'lua> FromLua<'lua> for Nvim<'lua> {
-    fn from_lua(value: mlua::Value<'lua>, lua: &'lua mlua::Lua) -> Result<Self> {
-        let r = Self {
-            raw: Table::from_lua(value, lua)?,
-            cache: Cache::default(),
-        };
-        Ok(r)
-    }
-}
-
 macro_rules! cache {
-    ($nvim:ident . $name:ident : $ty:ty) => {{
+    ($nvim:ident . $name:ident) => {{
         if $nvim.cache.$name.is_none() {
-            let v: $ty = $nvim.raw.get(stringify!($name))?;
+            let v = $nvim.raw.get(stringify!($name))?;
             $nvim.cache.$name = Some(v);
         }
         $nvim.cache.$name.as_ref().unwrap()
@@ -52,23 +43,28 @@ impl<'lua> Nvim<'lua> {
         Ok(r)
     }
 
-    pub fn set_opt<A: IntoLuaMulti<'lua>>(
-        &mut self,
-        name: &str,
-        value: A,
-    ) -> Result<()> {
-        cache!(self.set_opt: Function).call::<_, ()>((name, value))
+    pub fn set_opt<A>(&mut self, name: &str, value: A) -> Result<()>
+    where
+        A: IntoLuaMulti<'lua>,
+    {
+        cache!(self.set_opt).call((name, value))
     }
 
-    pub fn get_opt<R: FromLuaMulti<'lua>>(&mut self, name: &str) -> Result<R> {
-        cache!(self.get_opt: Function).call::<_, R>(name)
+    pub fn get_opt<R>(&mut self, name: &str) -> Result<R>
+    where
+        R: FromLuaMulti<'lua>,
+    {
+        cache!(self.get_opt).call(name)
     }
 
-    pub fn exec<A: IntoLuaMulti<'lua>>(&mut self, script: A) -> Result<()> {
-        cache!(self.exec: Function).call::<_, ()>(script)
+    pub fn exec<A>(&mut self, script: A) -> Result<()>
+    where
+        A: IntoLuaMulti<'lua>,
+    {
+        cache!(self.exec).call(script)
     }
 
     pub fn cache_dir(&mut self) -> Result<PathBuf> {
-        Ok(PathBuf::from(cache!(self.cache_dir: String)))
+        Ok(PathBuf::from(cache!(self.cache_dir)))
     }
 }

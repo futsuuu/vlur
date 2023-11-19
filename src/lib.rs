@@ -1,5 +1,6 @@
 mod cache;
 mod nvim;
+mod plugin;
 mod runtimepath;
 mod utils;
 
@@ -8,8 +9,9 @@ use std::{env, fs, path::Path};
 use mlua::{lua_module, Lua, Table, Value};
 use walkdir::WalkDir;
 
-use cache::Cache;
-use nvim::Nvim;
+pub use cache::Cache;
+pub use nvim::Nvim;
+use plugin::Plugin;
 pub use runtimepath::RuntimePath;
 use utils::expand_value;
 
@@ -47,42 +49,8 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
 
     let mut runtimepath: RuntimePath = nvim.get_opt("runtimepath")?;
 
-    if plugins.raw_len() != cache.inner.runtimepaths.len() {
-        cache.is_valid = false;
-    }
-    for plugin in plugins.sequence_values::<Table>() {
-        let Ok(plugin) = plugin else {
-            continue;
-        };
-        expand_value!(plugin, {
-            path: String,
-        });
-
-        let cache_key = &path;
-
-        if let (true, Some(rtp)) =
-            (cache.is_valid, cache.inner.runtimepaths.get(cache_key))
-        {
-            runtimepath += &rtp;
-            continue;
-        }
-
-        let mut rtp = RuntimePath::default();
-
-        let path = Path::new(&path);
-        if path.exists() {
-            rtp.push(path.to_str().unwrap(), false);
-
-            let after_path = path.join("after");
-            if after_path.exists() {
-                rtp.push(after_path.to_str().unwrap(), true);
-            }
-        }
-
-        runtimepath += &rtp;
-
-        cache.is_valid = false;
-        cache.inner.runtimepaths.insert(cache_key.to_string(), rtp);
+    for plugin in plugins.sequence_values::<Plugin>() {
+        plugin?.add_to_rtp(&mut runtimepath, &mut cache);
     }
 
     let packpath: String = nvim.get_opt("packpath")?;
@@ -109,7 +77,7 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
     // 6. after plugins in start packages
 
     // Update `&runtimepath`.
-    nvim.set_opt("runtimepath", runtimepath.clone())?;
+    nvim.set_opt("runtimepath", &runtimepath)?;
 
     let vimruntime = env::var_os("VIMRUNTIME").unwrap();
     let vimruntime = Path::new(&vimruntime);
@@ -117,8 +85,7 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
     let mut load_script = String::new();
 
     // Load the plugin scripts.
-    let rtp = runtimepath.to_string();
-    for dir in rtp.split(OPT_SEP) {
+    for dir in &runtimepath {
         let path = Path::new(dir);
         let plugins_filter = if path.starts_with(vimruntime) {
             plugins_filter.as_ref()

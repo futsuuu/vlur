@@ -139,6 +139,18 @@ impl std::ops::AddAssign<&RuntimePath> for RuntimePath {
     }
 }
 
+impl<'a> IntoIterator for &'a RuntimePath {
+    type Item = &'a str;
+    type IntoIter =
+        std::iter::Chain<std::str::Split<'a, char>, std::str::Split<'a, char>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let path = self.path.as_str().split(OPT_SEP);
+        let after_path = self.after_path.as_str().split(OPT_SEP);
+        path.chain(after_path)
+    }
+}
+
 impl<'lua> FromLua<'lua> for RuntimePath {
     fn from_lua(value: mlua::Value<'lua>, _lua: &'lua Lua) -> mlua::Result<Self> {
         let mlua::Value::String(lua_string) = value else {
@@ -153,10 +165,9 @@ impl<'lua> FromLua<'lua> for RuntimePath {
     }
 }
 
-impl<'lua> IntoLua<'lua> for RuntimePath {
+impl<'a, 'lua> IntoLua<'lua> for &'a RuntimePath {
     fn into_lua(self, lua: &'lua Lua) -> mlua::Result<mlua::Value<'lua>> {
-        let rtp = self.path + &self.after_path;
-        rtp.into_lua(lua)
+        self.to_string().into_lua(lua)
     }
 }
 
