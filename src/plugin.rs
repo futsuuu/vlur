@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use mlua::{FromLua, Lua, Result, Table};
 
@@ -38,7 +38,7 @@ impl Plugin {
             }
         }
 
-        let rtp = self.get_rtp();
+        let rtp = get_rtp(&self.path);
         *runtimepath += &rtp;
 
         cache.is_valid = false;
@@ -50,54 +50,48 @@ impl Plugin {
 
     pub fn lazy_load<'lua>(&self, lua: &'lua Lua, nvim: &mut Nvim<'lua>) -> Result<()> {
         let path = self.path.clone();
+
+        let loader = lua.create_function(move |lua, _: ()| {
+            let mut nvim = Nvim::new(lua)?;
+
+            let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
+            global_rtp += &get_rtp(&path);
+            nvim.set_opt("runtimepath", &global_rtp)?;
+
+            let mut files = get_plugin_files(&path);
+            files.extend(get_ftdetect_files(&path));
+            load_files(&mut nvim, &files, None)?;
+
+            Ok(())
+        })?;
+
         let loader_id = self.path.to_str().unwrap().to_string();
-        let rtp = self.get_rtp();
+        nvim.set_plugin_loader(&loader_id, loader)?;
 
-        nvim.set_plugin_loader(
-            loader_id.as_str(),
-            lua.create_function(move |lua, _: ()| {
-                let mut nvim = Nvim::new(lua)?;
+        let loader_executor = lua.create_function(move |lua, _: ()| {
+            let mut nvim = Nvim::new(lua)?;
+            let loader = nvim.get_plugin_loader(&loader_id)?;
+            loader.call(())?;
+            Ok(())
+        })?;
 
-                let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
-                global_rtp += &rtp;
-                nvim.set_opt("runtimepath", &global_rtp)?;
-
-                let path = path.as_path();
-                let mut files = get_plugin_files(path);
-                files.extend(get_ftdetect_files(path));
-                let files = files.as_slice();
-
-                load_files(&mut nvim, files, None)?;
-                Ok(())
-            })?,
-        )?;
-
-        nvim.create_autocmd(
-            "InsertEnter",
-            "*",
-            lua.create_function(move |lua, _: ()| {
-                let mut nvim = Nvim::new(lua)?;
-                nvim.get_plugin_loader(loader_id.as_str())?.call(())?;
-                Ok(())
-            })?,
-            true,
-        )?;
+        nvim.create_autocmd("InsertEnter", "*", loader_executor, true)?;
 
         Ok(())
     }
+}
 
-    fn get_rtp(&self) -> RuntimePath {
-        let mut rtp = RuntimePath::default();
+fn get_rtp(path: &Path) -> RuntimePath {
+    let mut rtp = RuntimePath::default();
 
-        if self.path.exists() {
-            rtp.push(self.path.to_str().unwrap(), false);
+    if path.exists() {
+        rtp.push(path.to_str().unwrap(), false);
 
-            let after_path = self.path.join("after");
-            if after_path.exists() {
-                rtp.push(after_path.to_str().unwrap(), true);
-            }
+        let after_path = path.join("after");
+        if after_path.exists() {
+            rtp.push(after_path.to_str().unwrap(), true);
         }
-
-        rtp
     }
+
+    rtp
 }
