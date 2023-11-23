@@ -56,8 +56,9 @@ pub struct Package {
 #[derive(Archive, Deserialize, Serialize, Default)]
 #[archive()]
 pub struct File {
-    pub stem: String,
     pub loader: FileLoader,
+    /// Used to disable loading for default plugins.
+    pub stem: Option<String>,
 }
 
 #[derive(Archive, Deserialize, Serialize)]

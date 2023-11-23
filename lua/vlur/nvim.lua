@@ -4,6 +4,9 @@ local fn = vim.fn
 
 local nvim = {}
 
+---@type table<string, function>
+nvim.plugin_loaders = {}
+
 nvim.cache_dir = fn.stdpath 'cache' .. '/vlur'
 nvim.state_dir = fn.stdpath 'state' .. '/vlur'
 
@@ -22,6 +25,19 @@ end
 ---@param command string
 function nvim.exec(command)
     api.nvim_exec2(command, {})
+end
+
+---@param event string|string[]
+---@param pattern string|string[]
+---@param callback fun(ev: table)
+---@param once boolean
+---@return integer
+function nvim.create_autocmd(event, pattern, callback, once)
+    return api.nvim_create_autocmd(event, {
+        pattern = pattern,
+        callback = callback,
+        once = once,
+    })
 end
 
 return nvim
