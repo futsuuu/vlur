@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
 use mlua::{
-    ChunkMode, FromLuaMulti, Function, Integer, IntoLua, IntoLuaMulti, Lua, Result,
-    Table,
+    ChunkMode, FromLua, FromLuaMulti, Function, Integer, IntoLua, IntoLuaMulti, Lua,
+    Result, Table, TableSequence, Value,
 };
+
+use crate::expand_value;
 
 pub struct Nvim<'lua> {
     lua: &'lua Lua,
@@ -19,6 +21,8 @@ struct Cache<'lua> {
     exec: Option<Function<'lua>>,
     cache_dir: Option<String>,
     create_autocmd: Option<Function<'lua>>,
+    get_autocmds: Option<Function<'lua>>,
+    exec_autocmds: Option<Function<'lua>>,
 }
 
 macro_rules! cache {
@@ -101,5 +105,65 @@ impl<'lua> Nvim<'lua> {
             callback,
             once,
         ))
+    }
+
+    pub fn get_autocmds<E, P>(
+        &mut self,
+        event: E,
+        pattern: P,
+    ) -> Result<TableSequence<'lua, AutoCommand<'lua>>>
+    where
+        E: IntoLua<'lua>,
+        P: IntoLua<'lua>,
+    {
+        let table: Table = cache!(self.get_autocmds)
+            .call((event.into_lua(self.lua)?, pattern.into_lua(self.lua)?))?;
+        Ok(table.sequence_values())
+    }
+
+    pub fn exec_autocmds<E, P>(
+        &mut self,
+        event: E,
+        pattern: P,
+        group: Option<Integer>,
+        data: Value,
+    ) -> Result<()>
+    where
+        E: IntoLua<'lua>,
+        P: IntoLua<'lua>,
+    {
+        cache!(self.exec_autocmds).call((
+            event.into_lua(self.lua)?,
+            pattern.into_lua(self.lua)?,
+            group,
+            data,
+        ))
+    }
+}
+
+#[derive(PartialEq)]
+pub struct AutoCommand<'lua> {
+    pub id: Option<Integer>,
+    pub group: Option<Integer>,
+    pub callback: Value<'lua>,
+}
+
+impl<'lua> FromLua<'lua> for AutoCommand<'lua> {
+    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
+        let value = Table::from_lua(value, lua)?;
+        expand_value!(value, {
+            id: Option<Integer>,
+            group: Option<Integer>,
+            command: mlua::String,
+            callback: Option<Value>,
+        });
+
+        let autocmd = Self {
+            id,
+            group,
+            callback: callback.unwrap_or(command.into_lua(lua)?),
+        };
+
+        Ok(autocmd)
     }
 }

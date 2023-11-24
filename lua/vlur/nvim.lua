@@ -1,4 +1,3 @@
--- NOTE: For compatibility and maintainability, use vim.* as little as possible outside of this file.
 local api = vim.api
 local fn = vim.fn
 
@@ -37,6 +36,28 @@ function nvim.create_autocmd(event, pattern, callback, once)
         pattern = pattern,
         callback = callback,
         once = once,
+    })
+end
+
+---@param event string|string[]
+---@param pattern string|string[]
+---@return table[]
+function nvim.get_autocmds(event, pattern)
+    return api.nvim_get_autocmds {
+        event = event,
+        pattern = pattern,
+    }
+end
+
+---@param event string|string[]
+---@param pattern string|string[]
+---@param group integer?
+---@param data any
+function nvim.exec_autocmds(event, pattern, group, data)
+    api.nvim_exec_autocmds(event, {
+        pattern = pattern,
+        data = data,
+        modeline = false,
     })
 end
 
