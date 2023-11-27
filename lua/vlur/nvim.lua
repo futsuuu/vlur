@@ -3,9 +3,6 @@ local fn = vim.fn
 
 local nvim = {}
 
----@type table<string, function>
-nvim.plugin_loaders = {}
-
 nvim.cache_dir = fn.stdpath 'cache' .. '/vlur'
 nvim.state_dir = fn.stdpath 'state' .. '/vlur'
 

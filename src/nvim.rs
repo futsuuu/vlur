@@ -15,7 +15,6 @@ pub struct Nvim<'lua> {
 
 #[derive(Default)]
 struct Cache<'lua> {
-    plugin_loaders: Option<Table<'lua>>,
     set_opt: Option<Function<'lua>>,
     get_opt: Option<Function<'lua>>,
     exec: Option<Function<'lua>>,
@@ -49,18 +48,6 @@ impl<'lua> Nvim<'lua> {
             cache: Cache::default(),
         };
         Ok(r)
-    }
-
-    pub fn set_plugin_loader(
-        &mut self,
-        name: &str,
-        loader: Function<'lua>,
-    ) -> Result<()> {
-        cache!(self.plugin_loaders).raw_set(name, loader)
-    }
-
-    pub fn get_plugin_loader(&mut self, name: &str) -> Result<Function<'lua>> {
-        cache!(self.plugin_loaders).raw_get(name)
     }
 
     pub fn set_opt<A>(&mut self, name: &str, value: A) -> Result<()>
