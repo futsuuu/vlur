@@ -23,7 +23,7 @@ crate-type = ["cdylib"]
 anyhow.workspace = true
 mlua = { workspace = true, features = ["module", "macros"] }
 walkdir = "2.4.0"
-hashbrown = { version = "0.14.2", features = ["rkyv"] }
+hashbrown = { version = "0.14.3", features = ["rkyv"] }
 rkyv = "0.7.42"
 
 [profile.release]
