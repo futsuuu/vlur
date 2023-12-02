@@ -1,35 +1,35 @@
 use std::path::{Path, PathBuf};
 
-use hashbrown::HashSet;
-use mlua::{FromLua, Function, Lua, Result, Table, Value};
+use mlua::{FromLua, Function, Lua, Result, Table, TableSequence};
 
 use crate::{
-    expand_value, get_ftdetect_files, get_plugin_files, load_files, Cache, Nvim,
-    RuntimePath,
+    expand_value, get_ftdetect_files, get_plugin_files, lazy, load_files, utils, Cache,
+    Nvim, RuntimePath,
 };
 
-pub struct Plugin {
+pub struct Plugin<'lua> {
     path: PathBuf,
-    pub lazy: bool,
+    lazy: Option<Table<'lua>>,
 }
 
-impl<'lua> FromLua<'lua> for Plugin {
+impl<'lua> FromLua<'lua> for Plugin<'lua> {
     fn from_lua(value: mlua::Value<'lua>, lua: &'lua Lua) -> Result<Self> {
         let table = Table::from_lua(value, lua)?;
 
         expand_value!(table, {
             path: String,
-            lazy: Option<bool>,
+            lazy: Option<Table>,
         });
         let r = Self {
             path: PathBuf::from(path),
-            lazy: lazy.unwrap_or_default(),
+            lazy,
         };
+
         Ok(r)
     }
 }
 
-impl Plugin {
+impl<'lua> Plugin<'lua> {
     pub fn add_to_rtp(&self, runtimepath: &mut RuntimePath, cache: &mut Cache) {
         if cache.is_valid {
             if let Some(rtp) = cache.inner.runtimepaths.get(self.path.to_str().unwrap())
@@ -49,10 +49,21 @@ impl Plugin {
             .insert(self.path.to_str().unwrap().to_string(), rtp);
     }
 
-    pub fn lazy_load<'lua>(&self, lua: &'lua Lua, nvim: &mut Nvim<'lua>) -> Result<()> {
+    #[inline]
+    pub fn get_lazy_handlers(&self) -> Option<TableSequence<'lua, lazy::Handler<'lua>>> {
+        self.lazy.clone().map(|t| t.sequence_values())
+    }
+
+    #[inline]
+    pub fn get_id(&self, lua: &'lua Lua) -> Result<mlua::String<'lua>> {
+        let bytes = utils::os_str_as_bytes(&self.path.as_os_str());
+        lua.create_string(bytes)
+    }
+
+    pub fn get_loader(&self, lua: &'lua Lua) -> Result<Function<'lua>> {
         let path = self.path.clone();
 
-        let loader = lua.create_function(move |lua, _: ()| {
+        let loader = move |lua, _: ()| {
             let mut nvim = Nvim::new(lua)?;
 
             let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
@@ -64,68 +75,10 @@ impl Plugin {
             load_files(&mut nvim, &files, None)?;
 
             Ok(())
-        })?;
+        };
 
-        let loader_executor = lua.create_function(loader_executor)?.bind(loader)?;
-        nvim.create_autocmd("InsertEnter", "*", loader_executor, true)?;
-
-        Ok(())
+        lua.create_function(loader)
     }
-}
-
-fn loader_executor<'lua>(
-    lua: &'lua Lua,
-    (plugin_loader, ev): (Function, Table),
-) -> Result<()> {
-    let mut nvim = Nvim::new(lua)?;
-    expand_value!(ev, {
-        event: mlua::String,
-        data: Value,
-    });
-    let event = event.to_str()?;
-
-    let mut exists_autocmds = Vec::new();
-    let mut exists_ids = HashSet::new();
-    let mut exists_groups = HashSet::new();
-    for autocmd in nvim.get_autocmds(event, "*")? {
-        let autocmd = autocmd?;
-        if let Some(id) = autocmd.id {
-            exists_ids.insert(id);
-        }
-        if let Some(group) = autocmd.group {
-            exists_groups.insert(group);
-        }
-        exists_autocmds.push(autocmd);
-    }
-
-    plugin_loader.call(())?;
-
-    let mut executed_groups = HashSet::new();
-    'autocmd: for autocmd in nvim.get_autocmds(event, "*")? {
-        let autocmd = autocmd?;
-        if let Some(id) = autocmd.id {
-            if exists_ids.contains(&id) {
-                continue;
-            }
-        }
-        if let Some(group) = autocmd.group {
-            if exists_groups.contains(&group) {
-                continue;
-            }
-            if executed_groups.contains(&group) {
-                continue;
-            }
-            executed_groups.insert(group);
-        }
-        for exists in &exists_autocmds {
-            if autocmd == *exists {
-                continue 'autocmd;
-            }
-        }
-        nvim.exec_autocmds(event, "*", autocmd.group, data.clone())?;
-    }
-
-    Ok(())
 }
 
 fn get_rtp(path: &Path) -> RuntimePath {

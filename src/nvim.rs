@@ -20,6 +20,7 @@ struct Cache<'lua> {
     exec: Option<Function<'lua>>,
     cache_dir: Option<String>,
     create_autocmd: Option<Function<'lua>>,
+    del_autocmd: Option<Function<'lua>>,
     get_autocmds: Option<Function<'lua>>,
     exec_autocmds: Option<Function<'lua>>,
 }
@@ -92,6 +93,10 @@ impl<'lua> Nvim<'lua> {
             callback,
             once,
         ))
+    }
+
+    pub fn del_autocmd(&mut self, id: Integer) -> Result<()> {
+        cache!(self.del_autocmd).call(id)
     }
 
     pub fn get_autocmds<E, P>(

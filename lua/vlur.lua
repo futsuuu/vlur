@@ -1,19 +1,18 @@
 local utils = require 'vlur.utils'
+local lib = utils.loadlib 'vlur'
 
 ---@class vlur
 local M = {}
+M.lazy = lib.lazy
+if lib.debug then
+    M._lib = lib
+end
 
 function M.setup(plugins, config)
-    local lib = utils.loadlib 'vlur'
-    if lib.debug then
-        M._lib = lib
-    end
-
-    local args = {}
-    args.plugins = plugins or {}
-    args.config = config or {}
-
-    lib.setup(args)
+    lib.setup {
+        plugins = plugins or {},
+        config = config or {},
+    }
 end
 
 return M

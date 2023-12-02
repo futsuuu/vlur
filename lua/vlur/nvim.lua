@@ -36,6 +36,11 @@ function nvim.create_autocmd(event, pattern, callback, once)
     })
 end
 
+---@param id integer
+function nvim.del_autocmd(id)
+    api.nvim_del_autocmd(id)
+end
+
 ---@param event string|string[]
 ---@param pattern string|string[]
 ---@return table[]
@@ -54,6 +59,7 @@ function nvim.exec_autocmds(event, pattern, group, data)
     api.nvim_exec_autocmds(event, {
         pattern = pattern,
         data = data,
+        group = group,
         modeline = false,
     })
 end

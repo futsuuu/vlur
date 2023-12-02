@@ -1,4 +1,5 @@
 mod cache;
+pub mod lazy;
 mod nvim;
 mod plugin;
 mod runtimepath;
@@ -27,6 +28,7 @@ fn vlur(lua: &Lua) -> mlua::Result<Table> {
     #[cfg(debug_assertions)]
     exports.set("debug", true)?;
 
+    exports.set("lazy", lazy::handlers(lua)?)?;
     exports.set("setup", lua.create_function(setup)?)?;
 
     Ok(exports)
@@ -52,10 +54,16 @@ fn setup(lua: &Lua, args: Table) -> mlua::Result<()> {
     for plugin in plugins.sequence_values::<Plugin>() {
         let plugin = plugin?;
 
-        if plugin.lazy {
-            plugin.lazy_load(lua, &mut nvim)?;
-        } else {
+        let Some(lazy_handlers) = plugin.get_lazy_handlers() else {
             plugin.add_to_rtp(&mut global_rtp, &mut cache);
+            continue;
+        };
+
+        let id = plugin.get_id(lua)?;
+        let loader = plugin.get_loader(lua)?;
+
+        for handler in lazy_handlers {
+            handler?.start(lua, id.clone(), loader.clone())?;
         }
     }
 
