@@ -1,28 +1,34 @@
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
-use mlua::{
-    ChunkMode, FromLua, FromLuaMulti, Function, Integer, IntoLua, IntoLuaMulti, Lua,
-    Result, Table, TableSequence, Value,
-};
+use mlua::prelude::*;
+use mlua::ChunkMode;
 
-use crate::expand_value;
+use crate::utils::expand_value;
+
+/// Separator character used for Neovim options.
+pub const OPT_SEP: char = ',';
+
+pub fn vimruntime() -> PathBuf {
+    let var = env::var_os("VIMRUNTIME").unwrap();
+    PathBuf::from(var)
+}
 
 pub struct Nvim<'lua> {
     lua: &'lua Lua,
-    raw: Table<'lua>,
+    raw: LuaTable<'lua>,
     cache: Cache<'lua>,
 }
 
 #[derive(Default)]
 struct Cache<'lua> {
-    set_opt: Option<Function<'lua>>,
-    get_opt: Option<Function<'lua>>,
-    exec: Option<Function<'lua>>,
+    set_opt: Option<LuaFunction<'lua>>,
+    get_opt: Option<LuaFunction<'lua>>,
+    exec: Option<LuaFunction<'lua>>,
     cache_dir: Option<String>,
-    create_autocmd: Option<Function<'lua>>,
-    del_autocmd: Option<Function<'lua>>,
-    get_autocmds: Option<Function<'lua>>,
-    exec_autocmds: Option<Function<'lua>>,
+    create_autocmd: Option<LuaFunction<'lua>>,
+    del_autocmd: Option<LuaFunction<'lua>>,
+    get_autocmds: Option<LuaFunction<'lua>>,
+    exec_autocmds: Option<LuaFunction<'lua>>,
 }
 
 macro_rules! cache {
@@ -36,11 +42,11 @@ macro_rules! cache {
 }
 
 impl<'lua> Nvim<'lua> {
-    pub fn new(lua: &'lua Lua) -> Result<Nvim<'lua>> {
+    pub fn new(lua: &'lua Lua) -> LuaResult<Nvim<'lua>> {
         let loader = lua.create_function(|lua, ()| {
             lua.load(&include_bytes!(concat!(env!("OUT_DIR"), "/nvim.luac"))[..])
                 .set_mode(ChunkMode::Binary)
-                .eval::<Table>()
+                .eval::<LuaTable>()
         })?;
         let raw = lua.load_from_function("vlur.nvim", loader)?;
         let r = Self {
@@ -51,28 +57,28 @@ impl<'lua> Nvim<'lua> {
         Ok(r)
     }
 
-    pub fn set_opt<A>(&mut self, name: &str, value: A) -> Result<()>
+    pub fn set_opt<A>(&mut self, name: &str, value: A) -> LuaResult<()>
     where
         A: IntoLuaMulti<'lua>,
     {
         cache!(self.set_opt).call((name, value))
     }
 
-    pub fn get_opt<R>(&mut self, name: &str) -> Result<R>
+    pub fn get_opt<R>(&mut self, name: &str) -> LuaResult<R>
     where
         R: FromLuaMulti<'lua>,
     {
         cache!(self.get_opt).call(name)
     }
 
-    pub fn exec<A>(&mut self, script: A) -> Result<()>
+    pub fn exec<A>(&mut self, script: A) -> LuaResult<()>
     where
         A: IntoLuaMulti<'lua>,
     {
         cache!(self.exec).call(script)
     }
 
-    pub fn cache_dir(&mut self) -> Result<PathBuf> {
+    pub fn cache_dir(&mut self) -> LuaResult<PathBuf> {
         Ok(PathBuf::from(cache!(self.cache_dir)))
     }
 
@@ -80,9 +86,9 @@ impl<'lua> Nvim<'lua> {
         &mut self,
         event: E,
         pattern: P,
-        callback: Function<'lua>,
+        callback: LuaFunction<'lua>,
         once: bool,
-    ) -> Result<Integer>
+    ) -> LuaResult<LuaInteger>
     where
         E: IntoLua<'lua>,
         P: IntoLua<'lua>,
@@ -95,7 +101,7 @@ impl<'lua> Nvim<'lua> {
         ))
     }
 
-    pub fn del_autocmd(&mut self, id: Integer) -> Result<()> {
+    pub fn del_autocmd(&mut self, id: LuaInteger) -> LuaResult<()> {
         cache!(self.del_autocmd).call(id)
     }
 
@@ -103,12 +109,12 @@ impl<'lua> Nvim<'lua> {
         &mut self,
         event: E,
         pattern: P,
-    ) -> Result<TableSequence<'lua, AutoCommand<'lua>>>
+    ) -> LuaResult<LuaTableSequence<'lua, AutoCommand<'lua>>>
     where
         E: IntoLua<'lua>,
         P: IntoLua<'lua>,
     {
-        let table: Table = cache!(self.get_autocmds)
+        let table: LuaTable = cache!(self.get_autocmds)
             .call((event.into_lua(self.lua)?, pattern.into_lua(self.lua)?))?;
         Ok(table.sequence_values())
     }
@@ -117,9 +123,9 @@ impl<'lua> Nvim<'lua> {
         &mut self,
         event: E,
         pattern: P,
-        group: Option<Integer>,
-        data: Value,
-    ) -> Result<()>
+        group: Option<LuaInteger>,
+        data: LuaValue,
+    ) -> LuaResult<()>
     where
         E: IntoLua<'lua>,
         P: IntoLua<'lua>,
@@ -135,19 +141,19 @@ impl<'lua> Nvim<'lua> {
 
 #[derive(PartialEq)]
 pub struct AutoCommand<'lua> {
-    pub id: Option<Integer>,
-    pub group: Option<Integer>,
-    pub callback: Value<'lua>,
+    pub id: Option<LuaInteger>,
+    pub group: Option<LuaInteger>,
+    pub callback: LuaValue<'lua>,
 }
 
 impl<'lua> FromLua<'lua> for AutoCommand<'lua> {
-    fn from_lua(value: Value<'lua>, lua: &'lua Lua) -> Result<Self> {
-        let value = Table::from_lua(value, lua)?;
+    fn from_lua(value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
+        let value = LuaTable::from_lua(value, lua)?;
         expand_value!(value, {
-            id: Option<Integer>,
-            group: Option<Integer>,
+            id: Option<LuaInteger>,
+            group: Option<LuaInteger>,
             command: mlua::String,
-            callback: Option<Value>,
+            callback: Option<LuaValue>,
         });
 
         let autocmd = Self {

@@ -9,10 +9,7 @@ if lib.debug then
 end
 
 function M.setup(plugins, config)
-    lib.setup {
-        plugins = plugins or {},
-        config = config or {},
-    }
+    lib.setup(plugins or {}, config or {})
 end
 
 return M

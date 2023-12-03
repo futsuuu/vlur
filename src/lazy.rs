@@ -2,7 +2,7 @@ mod event;
 
 use mlua::prelude::*;
 
-use crate::expand_value;
+use crate::utils::expand_value;
 
 const REG_NAME: &str = concat!(env!("CARGO_PKG_NAME"), ".stop_funcs");
 

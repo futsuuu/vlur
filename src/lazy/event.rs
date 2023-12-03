@@ -1,7 +1,7 @@
 use hashbrown::HashSet;
 use mlua::prelude::*;
 
-use crate::{expand_value, Nvim};
+use crate::{nvim::Nvim, utils::expand_value};
 
 pub struct Event {
     event: Vec<String>,
@@ -30,8 +30,12 @@ impl<'lua> Event {
                 .filter_map(|v| v.as_str().map(str::to_string))
                 .collect::<Vec<_>>()
         };
+
         let event = table_to_vec(event);
-        let pattern = pattern.map(table_to_vec).unwrap_or(vec!["*".into()]);
+        let pattern = match pattern {
+            Some(p) => table_to_vec(p),
+            None => vec![String::from("*")],
+        };
 
         let r = Self {
             event,

@@ -1,10 +1,10 @@
 use std::path::{self, Path};
 
-use mlua::{FromLua, IntoLua, Lua};
+use mlua::prelude::*;
 use rkyv::{Archive, Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::OPT_SEP;
+use crate::nvim::OPT_SEP;
 
 /// A structure to manage `&runtimepath`.
 ///

@@ -3,7 +3,9 @@ use std::{fs, path::Path};
 use hashbrown::HashMap;
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{RuntimePath, BUILT_TIME};
+use crate::runtimepath::RuntimePath;
+
+const BUILT_TIME: &str = include_str!(concat!(env!("OUT_DIR"), "/built_time"));
 
 #[derive(Default)]
 pub struct Cache {
@@ -20,9 +22,22 @@ impl Cache {
             inner,
         })
     }
-    pub fn write(&self, path: &Path) -> anyhow::Result<()> {
+
+    pub fn update(&mut self, path: &Path) -> anyhow::Result<()> {
+        if self.is_valid {
+            return Ok(());
+        }
+        if path.exists() {
+            fs::remove_file(path)?;
+            return Ok(());
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        self.inner.built_time = BUILT_TIME.to_string();
         let bytes = rkyv::to_bytes::<_, 0>(&self.inner)?;
         fs::write(path, bytes)?;
+
         Ok(())
     }
 }
