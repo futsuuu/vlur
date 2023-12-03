@@ -1,10 +1,10 @@
 use std::path::{self, Path};
 
-use mlua::{FromLua, IntoLua, Lua};
+use mlua::prelude::*;
 use rkyv::{Archive, Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::OPT_SEP;
+use crate::nvim::OPT_SEP;
 
 /// A structure to manage `&runtimepath`.
 ///
@@ -132,10 +132,21 @@ impl std::fmt::Display for RuntimePath {
 
 impl std::ops::AddAssign<&RuntimePath> for RuntimePath {
     fn add_assign(&mut self, other: &Self) {
-        *self = Self {
-            path: self.path.clone() + &other.path,
-            after_path: self.after_path.clone() + &other.after_path,
-        };
+        self.path.push(OPT_SEP);
+        self.path.push_str(&other.path);
+        self.after_path.push_str(&other.after_path);
+    }
+}
+
+impl<'a> IntoIterator for &'a RuntimePath {
+    type Item = &'a str;
+    type IntoIter =
+        std::iter::Chain<std::str::Split<'a, char>, std::str::Split<'a, char>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let path = self.path.as_str().split(OPT_SEP);
+        let after_path = self.after_path.as_str().split(OPT_SEP);
+        path.chain(after_path)
     }
 }
 
@@ -153,10 +164,9 @@ impl<'lua> FromLua<'lua> for RuntimePath {
     }
 }
 
-impl<'lua> IntoLua<'lua> for RuntimePath {
+impl<'a, 'lua> IntoLua<'lua> for &'a RuntimePath {
     fn into_lua(self, lua: &'lua Lua) -> mlua::Result<mlua::Value<'lua>> {
-        let rtp = self.path + &self.after_path;
-        rtp.into_lua(lua)
+        self.to_string().into_lua(lua)
     }
 }
 
@@ -168,6 +178,10 @@ mod tests {
     fn new() {
         let rtp =
             RuntimePath::new("/foo/bar,/baz/foobar,/foo/bar/after,/baz/foobar/after");
+        assert_eq!(
+            rtp.to_string().as_str(),
+            "/foo/bar,/baz/foobar,/foo/bar/after,/baz/foobar/after"
+        );
         assert_eq!(rtp.path.as_str(), "/foo/bar,/baz/foobar");
         assert_eq!(rtp.after_path.as_str(), ",/foo/bar/after,/baz/foobar/after");
     }
@@ -200,5 +214,27 @@ mod tests {
         assert!(!RuntimePath::package_filter(Path::new(
             "pack/pkg/start/plg/after/foo/bar"
         )));
+    }
+
+    #[test]
+    fn push() {
+        let mut rtp = RuntimePath::new("/foo/bar,/foo/bar/after");
+        rtp.push("/baz", false);
+        rtp.push("/baz/after", true);
+        assert_eq!(
+            rtp.to_string().as_str(),
+            "/foo/bar,/baz,/foo/bar/after,/baz/after"
+        );
+    }
+
+    #[test]
+    fn add_assign() {
+        let mut rtp = RuntimePath::new("/foo/bar,/foo/bar/after");
+        let other = RuntimePath::new("/baz,/baz/after");
+        rtp += &other;
+        assert_eq!(
+            rtp.to_string().as_str(),
+            "/foo/bar,/baz,/foo/bar/after,/baz/after"
+        );
     }
 }

@@ -1,0 +1,55 @@
+*vlur.txt*    A plugin manager for Neovim
+
+Repository:          https://github.com/futsuuu/vlur
+Author:              futsuuu <futsuuu123@gmail.com>
+License:             MIT License
+
+==============================================================================
+Installation                                               *vlur-installation*
+
+==============================================================================
+Usage                                                             *vlur-usage*
+
+==============================================================================
+Functions                                                     *vlur-functions*
+
+*vlur.setup* ({plugins})
+    Setup specified plugins.
+
+    Parameters: ~
+        - {plugins}: `table<string, vlur.Plugin>`
+            Keys are used as identifier of plugin.
+            Values are |vlur.Plugin|.
+
+*vlur.lazy.event* ({event}, {*pattern})
+
+    Parameters: ~
+        - {event}: `string[]`
+        - {pattern}: `string[] | nil`
+            `nil` is same with `{ "*" }`.
+            See also |autocmd-pattern|.
+
+    Return: ~
+        |vlur.LazyHandler|: `userdata`
+
+==============================================================================
+Types                                                             *vlur-types*
+
+*vlur.Plugin*
+
+    Fields: ~
+        - path: `string`
+        - lazy: `vlur.LazyHandler[] | nil`
+
+*vlur.LazyHandler*
+
+    Methods: ~
+        - start({self}, {plugin_loader})
+
+            Parameters: ~
+                - {plugin_loader}: `fun()`
+
+        - stop({self})
+
+==============================================================================
+vim:tw=78:ft=help:ts=8:sw=4:et:norl:
