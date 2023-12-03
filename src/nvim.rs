@@ -112,7 +112,8 @@ impl<'lua> Nvim<'lua> {
     where
         E: IntoLua<'lua>,
     {
-        let table: LuaTable = cache!(self.get_autocmds).call(event.into_lua(self.lua)?)?;
+        let table: LuaTable =
+            cache!(self.get_autocmds).call(event.into_lua(self.lua)?)?;
         Ok(table.sequence_values())
     }
 
@@ -125,11 +126,7 @@ impl<'lua> Nvim<'lua> {
     where
         E: IntoLua<'lua>,
     {
-        cache!(self.exec_autocmds).call((
-            event.into_lua(self.lua)?,
-            group,
-            data,
-        ))
+        cache!(self.exec_autocmds).call((event.into_lua(self.lua)?, group, data))
     }
 }
 
