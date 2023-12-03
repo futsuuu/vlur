@@ -105,34 +105,28 @@ impl<'lua> Nvim<'lua> {
         cache!(self.del_autocmd).call(id)
     }
 
-    pub fn get_autocmds<E, P>(
+    pub fn get_autocmds<E>(
         &mut self,
         event: E,
-        pattern: P,
     ) -> LuaResult<LuaTableSequence<'lua, AutoCommand<'lua>>>
     where
         E: IntoLua<'lua>,
-        P: IntoLua<'lua>,
     {
-        let table: LuaTable = cache!(self.get_autocmds)
-            .call((event.into_lua(self.lua)?, pattern.into_lua(self.lua)?))?;
+        let table: LuaTable = cache!(self.get_autocmds).call(event.into_lua(self.lua)?)?;
         Ok(table.sequence_values())
     }
 
-    pub fn exec_autocmds<E, P>(
+    pub fn exec_autocmds<E>(
         &mut self,
         event: E,
-        pattern: P,
         group: Option<LuaInteger>,
         data: LuaValue,
     ) -> LuaResult<()>
     where
         E: IntoLua<'lua>,
-        P: IntoLua<'lua>,
     {
         cache!(self.exec_autocmds).call((
             event.into_lua(self.lua)?,
-            pattern.into_lua(self.lua)?,
             group,
             data,
         ))

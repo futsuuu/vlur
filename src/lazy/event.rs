@@ -62,8 +62,7 @@ impl<'lua> Event {
         let pattern = self.pattern.as_slice();
         let plugin_loader = lua
             .create_function(exec_added_autocmds)?
-            .bind(plugin_loader)?
-            .bind(pattern)?;
+            .bind(plugin_loader)?;
 
         let id = nvim.create_autocmd(event, pattern, plugin_loader, true)?;
         self.autocmd_id = Some(id);
@@ -87,7 +86,7 @@ impl<'lua> Event {
 
 fn exec_added_autocmds(
     lua: &Lua,
-    (plugin_loader, pattern, ev): (LuaFunction, Vec<String>, LuaTable),
+    (plugin_loader, ev): (LuaFunction, LuaTable),
 ) -> LuaResult<()> {
     let mut nvim = Nvim::new(lua)?;
 
@@ -96,12 +95,11 @@ fn exec_added_autocmds(
         data: LuaValue,
     });
     let event = event.to_str()?;
-    let pattern = pattern.as_slice();
 
     let mut exists_autocmds = Vec::new();
     let mut exists_ids = HashSet::new();
     let mut exists_groups = HashSet::new();
-    for autocmd in nvim.get_autocmds(event, pattern)? {
+    for autocmd in nvim.get_autocmds(event)? {
         let autocmd = autocmd?;
         if let Some(id) = autocmd.id {
             exists_ids.insert(id);
@@ -115,7 +113,7 @@ fn exec_added_autocmds(
     plugin_loader.call(())?;
 
     let mut executed_groups = HashSet::new();
-    'autocmd: for autocmd in nvim.get_autocmds(event, pattern)? {
+    'autocmd: for autocmd in nvim.get_autocmds(event)? {
         let autocmd = autocmd?;
         if let Some(id) = autocmd.id {
             if exists_ids.contains(&id) {
@@ -136,7 +134,7 @@ fn exec_added_autocmds(
                 continue 'autocmd;
             }
         }
-        nvim.exec_autocmds(event, pattern, autocmd.group, data.clone())?;
+        nvim.exec_autocmds(event, autocmd.group, data.clone())?;
     }
 
     Ok(())
