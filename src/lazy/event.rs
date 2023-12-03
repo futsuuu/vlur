@@ -85,8 +85,8 @@ impl<'lua> Event {
     }
 }
 
-fn exec_added_autocmds<'lua>(
-    lua: &'lua Lua,
+fn exec_added_autocmds(
+    lua: &Lua,
     (plugin_loader, pattern, ev): (LuaFunction, Vec<String>, LuaTable),
 ) -> LuaResult<()> {
     let mut nvim = Nvim::new(lua)?;

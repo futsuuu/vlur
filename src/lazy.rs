@@ -6,7 +6,7 @@ use crate::utils::expand_value;
 
 const REG_NAME: &str = concat!(env!("CARGO_PKG_NAME"), ".stop_funcs");
 
-fn get_registry<'lua>(lua: &'lua Lua) -> LuaResult<LuaTable<'lua>> {
+fn get_registry(lua: &Lua) -> LuaResult<LuaTable<'_>> {
     let r = lua
         .named_registry_value(REG_NAME)
         .unwrap_or(lua.create_table()?);
@@ -82,7 +82,7 @@ impl<'lua> FromLua<'lua> for Handler<'lua> {
     }
 }
 
-pub fn handlers<'lua>(lua: &'lua Lua) -> LuaResult<LuaTable<'lua>> {
+pub fn handlers(lua: &Lua) -> LuaResult<LuaTable<'_>> {
     let t = lua.create_table()?;
 
     t.set("event", lua.create_function(event::Event::new)?)?;
