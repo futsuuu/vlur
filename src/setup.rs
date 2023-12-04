@@ -32,7 +32,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         let loader = plugin.get_loader(lua)?;
 
         for handler in lazy_handlers {
-            handler?.start(lua, id.clone(), loader.clone())?;
+            handler?.setup(lua, id.clone(), loader.clone())?;
         }
     }
 

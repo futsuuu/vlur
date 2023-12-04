@@ -4,36 +4,91 @@ use mlua::prelude::*;
 
 use crate::utils::expand_value;
 
-const REG_NAME: &str = concat!(env!("CARGO_PKG_NAME"), ".stop_funcs");
+/// `registry[REGISTRY_KEY]: table<plugin_id, stop_func[]>`
+mod stop_funcs {
+    use mlua::prelude::*;
 
-fn get_registry(lua: &Lua) -> LuaResult<LuaTable<'_>> {
-    let r = lua
-        .named_registry_value(REG_NAME)
-        .unwrap_or(lua.create_table()?);
-    Ok(r)
+    const REGISTRY_KEY: &str = concat!(env!("CARGO_PKG_NAME"), ".stop_funcs");
+
+    fn get_reg_value(lua: &Lua) -> LuaResult<LuaTable<'_>> {
+        let reg_value: LuaTable = lua
+            .named_registry_value(REGISTRY_KEY)
+            .unwrap_or(lua.create_table()?);
+        Ok(reg_value)
+    }
+
+    pub fn get<'lua>(
+        lua: &'lua Lua,
+        plugin_id: LuaString<'lua>,
+    ) -> LuaResult<LuaTable<'lua>> {
+        let reg_value = get_reg_value(lua)?;
+        let funcs = reg_value.raw_get(plugin_id).unwrap_or(lua.create_table()?);
+
+        Ok(funcs)
+    }
+
+    pub fn set(
+        lua: &Lua,
+        plugin_id: LuaString,
+        stop_func: LuaFunction,
+    ) -> LuaResult<()> {
+        let reg_value = get_reg_value(lua)?;
+        let funcs = reg_value
+            .raw_get(plugin_id.clone())
+            .unwrap_or(lua.create_table()?);
+
+        funcs.raw_push(stop_func)?;
+        reg_value.raw_set(plugin_id, funcs)?;
+        lua.set_named_registry_value(REGISTRY_KEY, reg_value)?;
+
+        Ok(())
+    }
+
+    pub fn clear(lua: &Lua, plugin_id: LuaString) -> LuaResult<()> {
+        let reg_value = get_reg_value(lua)?;
+
+        reg_value.raw_set(plugin_id, LuaValue::Nil)?;
+        lua.set_named_registry_value(REGISTRY_KEY, reg_value)?;
+
+        Ok(())
+    }
 }
 
 pub struct Handler<'lua> {
     handler: LuaValue<'lua>,
-    lua_start: LuaFunction<'lua>,
-    lua_stop: LuaFunction<'lua>,
+    start: LuaFunction<'lua>,
+    stop: LuaFunction<'lua>,
 }
 
 impl<'lua> Handler<'lua> {
-    pub fn start(
+    pub fn setup(
         &self,
         lua: &'lua Lua,
         plugin_id: LuaString<'lua>,
         plugin_loader: LuaFunction<'lua>,
     ) -> LuaResult<()> {
-        let funcs = get_registry(lua)?;
-        funcs
-            .get(plugin_id.clone())
-            .unwrap_or(lua.create_table()?)
-            .push(self.lua_stop.clone())?;
-        lua.set_named_registry_value(REG_NAME, funcs)?;
+        stop_funcs::set(lua, plugin_id.clone(), self.stop.clone())?;
 
-        self.lua_start.call((self.handler.clone(), plugin_loader))?;
+        let plugin_loader = lua
+            .create_function(Self::load_plugin_and_stop_handlers)?
+            .bind((plugin_id.clone(), plugin_loader.clone()))?;
+
+        self.start.call(plugin_loader)?;
+
+        Ok(())
+    }
+
+    fn load_plugin_and_stop_handlers(
+        lua: &Lua,
+        (plugin_id, plugin_loader): (LuaString, LuaFunction),
+    ) -> LuaResult<()> {
+        plugin_loader.call(())?;
+
+        for f in stop_funcs::get(lua, plugin_id.clone())?.sequence_values() {
+            let f: LuaFunction = f?;
+            f.call(())?;
+        }
+        stop_funcs::clear(lua, plugin_id)?;
 
         Ok(())
     }
@@ -46,8 +101,8 @@ impl<'lua> IntoLua<'lua> for Handler<'lua> {
 }
 
 impl<'lua> FromLua<'lua> for Handler<'lua> {
-    fn from_lua(value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
-        let (lua_start, lua_stop) = match value {
+    fn from_lua(handler: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
+        let (start, stop) = match handler {
             LuaValue::Table(ref t) => {
                 expand_value!(t, {
                     start: LuaFunction,
@@ -64,7 +119,7 @@ impl<'lua> FromLua<'lua> for Handler<'lua> {
             }
             _ => {
                 let error = LuaError::FromLuaConversionError {
-                    from: value.type_name(),
+                    from: handler.type_name(),
                     to: "table or userdata",
                     message: None,
                 };
@@ -72,10 +127,13 @@ impl<'lua> FromLua<'lua> for Handler<'lua> {
             }
         };
 
+        let start = start.bind(handler.clone())?;
+        let stop = stop.bind(handler.clone())?;
+
         let handler = Self {
-            handler: value,
-            lua_start,
-            lua_stop,
+            handler,
+            start,
+            stop,
         };
 
         Ok(handler)
