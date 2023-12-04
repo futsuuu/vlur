@@ -9,13 +9,13 @@ nvim.state_dir = fn.stdpath 'state' .. '/vlur'
 ---@param name string
 ---@return any
 function nvim.get_opt(name)
-    return api.nvim_get_option_value(name, {})
+    return api.nvim_get_option_value(name, { scope = 'global' })
 end
 
 ---@param name string
 ---@param value any
 function nvim.set_opt(name, value)
-    api.nvim_set_option_value(name, value, {})
+    api.nvim_set_option_value(name, value, { scope = 'global' })
 end
 
 ---@param command string
