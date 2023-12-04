@@ -6,7 +6,7 @@ use crate::{nvim::Nvim, utils::expand_value};
 pub struct Event {
     event: Vec<String>,
     pattern: Vec<String>,
-    autocmd_id: Option<LuaInteger>,
+    autocmd_ids: Vec<LuaInteger>,
 }
 
 impl LuaUserData for Event {
@@ -15,32 +15,47 @@ impl LuaUserData for Event {
             this.start(lua, plugin_loader)
         });
 
-        methods.add_method("stop", |lua, this, _: ()| this.stop(lua));
+        methods.add_method_mut("stop", |lua, this, _: ()| this.stop(lua));
     }
 }
 
 impl<'lua> Event {
     pub fn new(
-        _lua: &'lua Lua,
-        (event, pattern): (LuaTable<'lua>, Option<LuaTable<'lua>>),
+        lua: &'lua Lua,
+        (event, pattern): (LuaValue<'lua>, Option<LuaValue<'lua>>),
     ) -> LuaResult<Self> {
-        let table_to_vec = |t: LuaTable| {
-            t.sequence_values::<LuaValue>()
+        let value_to_vec = |v: LuaValue| {
+            let t = match v {
+                LuaValue::Table(t) => t,
+                LuaValue::String(s) => {
+                    let t = lua.create_table()?;
+                    t.push(s)?;
+                    t
+                }
+                _ => {
+                    let err = LuaError::FromLuaConversionError {
+                        from: v.type_name(),
+                        to: "string or table",
+                        message: None,
+                    };
+                    return Err(err);
+                }
+            };
+            Ok(t.sequence_values::<String>()
                 .filter_map(|v| v.ok())
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>())
         };
 
-        let event = table_to_vec(event);
+        let event = value_to_vec(event)?;
         let pattern = match pattern {
-            Some(p) => table_to_vec(p),
+            Some(p) => value_to_vec(p)?,
             None => vec![String::from("*")],
         };
 
         let r = Self {
             event,
             pattern,
-            autocmd_id: None,
+            autocmd_ids: Vec::new(),
         };
         Ok(r)
     }
@@ -50,12 +65,6 @@ impl<'lua> Event {
         lua: &'lua Lua,
         plugin_loader: LuaFunction<'lua>,
     ) -> LuaResult<()> {
-        if self.autocmd_id.is_some() {
-            return Err(LuaError::runtime(
-                "LazyHandler.start() called after starting",
-            ));
-        };
-
         let mut nvim = Nvim::new(lua)?;
 
         let event = self.event.as_slice();
@@ -65,20 +74,21 @@ impl<'lua> Event {
             .bind(plugin_loader)?;
 
         let id = nvim.create_autocmd(event, pattern, plugin_loader, true)?;
-        self.autocmd_id = Some(id);
+        self.autocmd_ids.push(id);
 
         Ok(())
     }
 
-    fn stop(&self, lua: &'lua Lua) -> LuaResult<()> {
-        let Some(id) = self.autocmd_id else {
-            return Err(LuaError::runtime(
-                "LazyHandler.stop() called before starting",
-            ));
-        };
+    fn stop(&mut self, lua: &'lua Lua) -> LuaResult<()> {
+        if self.autocmd_ids.is_empty() {
+            return Ok(());
+        }
 
         let mut nvim = Nvim::new(lua)?;
-        nvim.del_autocmd(id)?;
+        for id in &self.autocmd_ids {
+            nvim.del_autocmd(*id)?;
+        }
+        self.autocmd_ids.clear();
 
         Ok(())
     }
