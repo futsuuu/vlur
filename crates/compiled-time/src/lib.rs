@@ -1,5 +1,5 @@
-use proc_macro::{TokenStream, TokenTree, Literal};
-use std::time::{UNIX_EPOCH, SystemTime};
+use proc_macro::{Literal, TokenStream, TokenTree};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[proc_macro]
 pub fn bytes(_: TokenStream) -> TokenStream {

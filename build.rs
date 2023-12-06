@@ -1,8 +1,4 @@
-use std::{
-    env,
-    path::Path,
-    process::Command,
-};
+use std::{env, path::Path, process::Command};
 
 fn main() -> anyhow::Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
