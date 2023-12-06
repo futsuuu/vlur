@@ -1,10 +1,9 @@
 use std::{
     env, fs,
     path::Path,
+    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-use mlua::Lua;
 
 fn main() -> anyhow::Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -16,11 +15,13 @@ fn main() -> anyhow::Result<()> {
         .as_millis();
     fs::write(out_dir.join("built_time"), built_time.to_string())?;
 
-    let lua = Lua::new();
-    let func = lua
-        .load(include_str!("lua/vlur/nvim.lua"))
-        .into_function()?;
-    fs::write(out_dir.join("nvim.luac"), func.dump(true))?;
+    println!("cargo:rerun-if-changed=lua/vlur/nvim.lua");
+    println!("cargo:rerun-if-changed=scripts/bump_file.lua");
+    Command::new("nvim")
+        .args(["-l", "scripts/bump_file.lua"])
+        .arg("lua/vlur/nvim.lua")
+        .arg(out_dir.join("nvim.luac"))
+        .status()?;
 
     Ok(())
 }

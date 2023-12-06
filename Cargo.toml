@@ -28,7 +28,6 @@ rkyv = "0.7.42"
 
 [build-dependencies]
 anyhow.workspace = true
-mlua = { workspace = true, features = ["vendored"] }
 
 [profile.release]
 lto = true
