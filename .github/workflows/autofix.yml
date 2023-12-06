@@ -33,7 +33,6 @@ jobs:
 
       - name: Fix Rust code
         run: |
-          rustup component add rustfmt clippy
           cargo clippy --workspace --fix --allow-dirty
           cargo fmt
 
