@@ -5,7 +5,7 @@ use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::runtimepath::RuntimePath;
 
-const BUILT_TIME: &str = include_str!(concat!(env!("OUT_DIR"), "/built_time"));
+const COMPILED_TIME: &[u8] = compiled_time::bytes!();
 
 #[derive(Default)]
 pub struct Cache {
@@ -18,7 +18,7 @@ impl Cache {
         let bytes = fs::read(path)?;
         let inner: Inner = unsafe { rkyv::from_bytes_unchecked(&bytes)? };
         Ok(Self {
-            is_valid: inner.built_time == BUILT_TIME,
+            is_valid: inner.built_time == COMPILED_TIME,
             inner,
         })
     }
@@ -34,7 +34,7 @@ impl Cache {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        self.inner.built_time = BUILT_TIME.to_string();
+        self.inner.built_time = COMPILED_TIME.to_vec();
         let bytes = rkyv::to_bytes::<_, 0>(&self.inner)?;
         fs::write(path, bytes)?;
 
@@ -45,7 +45,7 @@ impl Cache {
 #[derive(Archive, Deserialize, Serialize, Default)]
 #[archive()]
 pub struct Inner {
-    pub built_time: String,
+    pub built_time: Vec<u8>,
 
     /// [`RuntimePath`] added by `&packpath`.
     pub package: Package,

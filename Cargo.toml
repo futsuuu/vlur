@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "xtask",
+    "crates/*",
 ]
 
 [workspace.package]
@@ -20,6 +21,7 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+compiled-time = { path = "crates/compiled-time" }
 anyhow.workspace = true
 mlua = { workspace = true, features = ["module", "macros"] }
 walkdir = "2.4.0"
@@ -28,7 +30,6 @@ rkyv = "0.7.42"
 
 [build-dependencies]
 anyhow.workspace = true
-mlua = { workspace = true, features = ["vendored"] }
 
 [profile.release]
 lto = true
