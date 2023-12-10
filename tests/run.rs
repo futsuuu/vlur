@@ -8,7 +8,15 @@ pub fn run(vimrc: &str) {
     let sandbox = create_sandbox(vimrc);
 
     let mut command = Command::new("nvim");
-    command.args(["--headless", "+qa!", "--cmd", "set rtp^=.", "-u", vimrc]);
+    command.args([
+        "--headless",
+        "-S",
+        "scripts/quit.vim",
+        "--cmd",
+        "set rtp^=.",
+        "-u",
+        vimrc,
+    ]);
     set_virtual_env(&mut command, &sandbox);
 
     let status = command.status().unwrap();
@@ -16,7 +24,8 @@ pub fn run(vimrc: &str) {
 }
 
 fn set_virtual_env(command: &mut Command, sandbox: &Path) {
-    command.env("NVIM_APPNAME", "nvim")
+    command
+        .env("NVIM_APPNAME", "nvim")
         .env("XDG_DATA_HOME", sandbox.join("data"))
         .env("XDG_STATE_HOME", sandbox.join("state"))
         .env("XDG_CACHE_HOME", sandbox.join("cache"))
