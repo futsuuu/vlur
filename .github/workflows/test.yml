@@ -35,5 +35,8 @@ jobs:
           neovim: true
           version: stable
 
+      - name: Build
+        run: cargo xtask build
+
       - name: Test
         run: cargo test --workspace

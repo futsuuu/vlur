@@ -70,10 +70,8 @@ impl RuntimePath {
                 if !entry.file_type().is_dir() {
                     return false;
                 }
-                let Ok(path) = entry.path().canonicalize() else {
-                    return false;
-                };
-                let Ok(rel_path) = path.strip_prefix(dir) else {
+                let path = entry.path();
+                let Some(rel_path) = strip_prefix(path, dir) else {
                     return false;
                 };
                 Self::package_filter(rel_path)
@@ -170,6 +168,57 @@ impl<'a, 'lua> IntoLua<'lua> for &'a RuntimePath {
     }
 }
 
+#[cfg(not(windows))]
+#[inline]
+fn strip_prefix<'a>(path: &'a Path, prefix: &Path) -> Option<&'a Path> {
+    path.strip_prefix(prefix).ok()
+}
+
+/// Unlike [`std::path::Path::strip_prefix()`], this function ignores
+/// whether the path prefix is `verbatim` or not.
+#[cfg(windows)]
+fn strip_prefix<'a>(path: &'a Path, prefix: &Path) -> Option<&'a Path> {
+    use path::{
+        Component,
+        Prefix::{Disk, VerbatimDisk, VerbatimUNC, UNC},
+    };
+
+    let mut path = path.components();
+    for prefix in prefix.components() {
+        let Some(path) = path.next() else {
+            return None;
+        };
+
+        let (Component::Prefix(pc1), Component::Prefix(pc2)) = (path, prefix) else {
+            if path != prefix {
+                return None;
+            }
+            continue;
+        };
+
+        match (pc1.kind(), pc2.kind()) {
+            (VerbatimDisk(vd), Disk(d)) | (Disk(d), VerbatimDisk(vd)) => {
+                if vd != d {
+                    return None;
+                }
+            }
+            (VerbatimUNC(vu1, vu2), UNC(u1, u2))
+            | (UNC(u1, u2), VerbatimUNC(vu1, vu2)) => {
+                if vu1 != u1 || vu2 != u2 {
+                    return None;
+                }
+            }
+            (p1, p2) => {
+                if p1 != p2 {
+                    return None;
+                }
+            }
+        }
+    }
+
+    Some(path.as_path())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,6 +284,30 @@ mod tests {
         assert_eq!(
             rtp.to_string().as_str(),
             "/foo/bar,/baz,/foo/bar/after,/baz/after"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn strip_prefix_for_windows() {
+        assert!(strip_prefix(Path::new("foo"), Path::new("")).is_some());
+        assert_eq!(
+            strip_prefix(Path::new("/foo/bar/baz"), Path::new("/foo")),
+            Some(Path::new("bar/baz"))
+        );
+        assert_eq!(
+            strip_prefix(
+                Path::new(r"C:\Users\foo\some/path"),
+                Path::new(r"\\?\C:\Users\")
+            ),
+            Some(Path::new("foo/some/path"))
+        );
+        assert_eq!(
+            strip_prefix(
+                Path::new(r"\\?\C:\Users\foo\some\path"),
+                Path::new(r"C:/Users/")
+            ),
+            Some(Path::new("foo/some/path"))
         );
     }
 }
