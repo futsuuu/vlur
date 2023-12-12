@@ -11,4 +11,3 @@ require('vlur').setup({}, {
 assert(g.loaded_man == nil)
 assert(g.loaded_matchparen == nil)
 assert(g.loaded_netrwPlugin ~= nil)
-
