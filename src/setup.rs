@@ -21,6 +21,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
 
     let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
 
+    let mut all_lazy_handlers = Vec::new();
     for pair in plugins.pairs::<LuaString, Plugin>() {
         let (id, plugin) = pair?;
 
@@ -32,8 +33,15 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         let loader = plugin.get_loader(lua)?;
 
         for handler in lazy_handlers {
-            handler?.setup(lua, id.clone(), loader.clone())?;
+            let mut handler = handler?;
+            handler.bind(lua, id.clone(), loader.clone())?;
+            all_lazy_handlers.push(handler);
         }
+    }
+
+    // Start lazy handlers after all plugins are installed.
+    for handler in all_lazy_handlers {
+        handler.setup()?;
     }
 
     global_rtp += get_rtp_in_packpath(&mut nvim, &mut cache)?;
