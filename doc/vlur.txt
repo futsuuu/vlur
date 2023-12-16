@@ -32,6 +32,14 @@ Functions                                                     *vlur-functions*
     Return: ~
         |vlur.LazyHandler|: `userdata`
 
+*vlur.install.git* ({url})
+
+    Parameters: ~
+        - {url}: `string`
+
+    Return: ~
+        |vlur.Installer|: `userdata`
+
 ==============================================================================
 Types                                                             *vlur-types*
 
@@ -50,6 +58,31 @@ Types                                                             *vlur-types*
                 - {plugin_loader}: `fun()`
 
         - stop({self})
+
+*vlur.Installer*
+
+    Methods: ~
+        - setup({self}, {path})
+            Return `true` if a plugin is installed in the {path}.
+
+            Parameters: ~
+                - {path}: `string`
+
+            Return: ~
+                `boolean`
+
+        - install({self})
+            Start installing a plugin. This function must be non-blocking.
+
+        - progress({self})
+
+            Return: ~
+                |vlur.Progress|
+
+*vlur.Progress*
+
+    Fields: ~
+        - is_finished: `bool`
 
 ==============================================================================
 vim:tw=78:ft=help:ts=8:sw=4:et:norl:

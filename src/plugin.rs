@@ -3,11 +3,15 @@ use std::path::{Path, PathBuf};
 use mlua::prelude::*;
 use walkdir::WalkDir;
 
-use crate::{cache, lazy, nvim::Nvim, runtimepath::RuntimePath, utils::expand_value};
+use crate::{
+    cache, install::Installer, lazy::Handler as LazyHandler, nvim::Nvim,
+    runtimepath::RuntimePath, utils::expand_value,
+};
 
 pub struct Plugin<'lua> {
     path: PathBuf,
     lazy: Option<LuaTable<'lua>>,
+    install: Option<Installer<'lua>>,
 }
 
 impl<'lua> FromLua<'lua> for Plugin<'lua> {
@@ -17,10 +21,12 @@ impl<'lua> FromLua<'lua> for Plugin<'lua> {
         expand_value!(table, {
             path: String,
             lazy: Option<LuaTable>,
+            install: Option<Installer>,
         });
         let r = Self {
             path: PathBuf::from(path),
             lazy,
+            install,
         };
 
         Ok(r)
@@ -50,8 +56,18 @@ impl<'lua> Plugin<'lua> {
     #[inline]
     pub fn get_lazy_handlers(
         &self,
-    ) -> Option<LuaTableSequence<'lua, lazy::Handler<'lua>>> {
+    ) -> Option<LuaTableSequence<'lua, LazyHandler<'lua>>> {
         self.lazy.clone().map(|t| t.sequence_values())
+    }
+
+    pub fn setup_installer(&self) -> LuaResult<Option<&Installer<'lua>>> {
+        let Some(ref installer) = self.install else {
+            return Ok(None);
+        };
+        if !installer.setup(&self.path)? {
+            return Ok(Some(installer));
+        }
+        Ok(None)
     }
 
     pub fn get_loader(&self, lua: &'lua Lua) -> LuaResult<LuaFunction<'lua>> {

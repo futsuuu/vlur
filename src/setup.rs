@@ -4,6 +4,7 @@ use mlua::prelude::*;
 
 use crate::{
     cache::Cache,
+    install::install,
     nvim::{self, Nvim},
     plugin::{get_plugin_files, load_files, Plugin},
     runtimepath::RuntimePath,
@@ -21,9 +22,14 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
 
     let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
 
+    let mut installers = Vec::new();
     let mut all_lazy_handlers = Vec::new();
     for pair in plugins.pairs::<LuaString, Plugin>() {
         let (id, plugin) = pair?;
+
+        if let Some(installer) = plugin.setup_installer()? {
+            installers.push(installer.clone());
+        }
 
         let Some(lazy_handlers) = plugin.get_lazy_handlers() else {
             plugin.add_to_rtp(&mut global_rtp, &mut cache);
@@ -38,6 +44,8 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             all_lazy_handlers.push(handler);
         }
     }
+
+    install(installers, 5)?;
 
     // Start lazy handlers after all plugins are installed.
     for handler in all_lazy_handlers {
