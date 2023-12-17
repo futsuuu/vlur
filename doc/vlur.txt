@@ -47,6 +47,7 @@ Types                                                             *vlur-types*
 
     Fields: ~
         - path: `string`
+        - install: `vlur.Installer | nil`
         - lazy: `vlur.LazyHandler[] | nil`
 
 *vlur.LazyHandler*
