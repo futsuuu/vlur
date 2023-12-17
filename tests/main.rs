@@ -12,3 +12,8 @@ fn default_plugins() {
 fn packpath() {
     run("tests/packpath/read.lua");
 }
+
+#[test]
+fn install() {
+    run("tests/install.lua");
+}
