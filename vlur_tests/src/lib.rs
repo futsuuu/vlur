@@ -1,45 +1,44 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-};
+mod run;
 
-pub fn run(vimrc: &str) {
-    let sandbox = create_sandbox(vimrc);
+use std::fs;
 
-    let mut command = Command::new("nvim");
-    command.args([
-        "--headless",
-        "-S",
-        "../scripts/quit.vim",
-        "--cmd",
-        "set rtp^=..",
-        "-u",
-        vimrc,
-    ]);
-    set_virtual_env(&mut command, &sandbox);
+use run::{run, StartupOption::*};
 
-    let status = command.status().unwrap();
-    assert!(status.success());
+pub fn test(vimrc: &str) {
+    run(vimrc, true, &[Headless, SetRtp, QuitWithCode]);
 }
 
-fn set_virtual_env(command: &mut Command, sandbox: &Path) {
-    command
-        .env("NVIM_APPNAME", "nvim")
-        .env("XDG_DATA_HOME", sandbox.join("data"))
-        .env("XDG_STATE_HOME", sandbox.join("state"))
-        .env("XDG_CACHE_HOME", sandbox.join("cache"))
-        .env("XDG_CONFIG_HOME", sandbox.join("config"))
-        .env("XDG_RUNTIME_DIR", sandbox.join("run"))
-        .env("NVIM_LOG_FILE", sandbox.join("log").join("log"));
-}
+pub fn bench(vimrc: &str) {
+    let count = 70;
+    let warmup = 30;
+    let file = "__startuptime.log";
+    let opts = &[Env("LANG", "C"), Headless, StartupTime(file), Quit];
+    let mut logs = Vec::with_capacity(warmup + count);
 
-fn create_sandbox(name: &str) -> PathBuf {
-    let path = Path::new("temp").join(name);
-    if path.exists() {
-        fs::remove_dir_all(&path)
-            .expect("Failed to remove the old temporary directory.");
+    run(vimrc, true, opts);
+    for _ in 0..logs.capacity() {
+        run(vimrc, false, opts);
+        logs.push(fs::read_to_string(file).unwrap());
+        fs::remove_file(file).unwrap();
     }
-    fs::create_dir_all(&path).expect("Failed to create a new temporary directory.");
-    path
+
+    let results: Vec<f32> = logs[warmup..]
+        .into_iter()
+        .map(|log| {
+            log.lines()
+                .last()
+                .unwrap()
+                .split_once(' ')
+                .unwrap()
+                .0
+                .parse::<f32>()
+                .unwrap()
+        })
+        .collect();
+    println!(
+        "mean: {mean}\t min: {min}\t max: {max}",
+        mean = results.iter().sum::<f32>() / count as f32,
+        min = results.iter().fold(0.0 / 0.0, |m, v| v.min(m)),
+        max = results.iter().fold(0.0, |m, v| v.max(m)),
+    );
 }
