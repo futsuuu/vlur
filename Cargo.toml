@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "vlur",
     "vlur_macros",
+    "vlur_tests",
     "xtask",
 ]
 

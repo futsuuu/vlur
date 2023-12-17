@@ -11,9 +11,9 @@ pub fn run(vimrc: &str) {
     command.args([
         "--headless",
         "-S",
-        "scripts/quit.vim",
+        "../scripts/quit.vim",
         "--cmd",
-        "set rtp^=.",
+        "set rtp^=..",
         "-u",
         vimrc,
     ]);
@@ -35,7 +35,7 @@ fn set_virtual_env(command: &mut Command, sandbox: &Path) {
 }
 
 fn create_sandbox(name: &str) -> PathBuf {
-    let path = Path::new(file!()).parent().unwrap().join("temp").join(name);
+    let path = Path::new("temp").join(name);
     if path.exists() {
         fs::remove_dir_all(&path)
             .expect("Failed to remove the old temporary directory.");
