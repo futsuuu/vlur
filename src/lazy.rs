@@ -61,8 +61,8 @@ pub struct Handler<'lua> {
 }
 
 impl<'lua> Handler<'lua> {
-    pub fn setup(
-        &self,
+    pub fn bind(
+        &mut self,
         lua: &'lua Lua,
         plugin_id: LuaString<'lua>,
         plugin_loader: LuaFunction<'lua>,
@@ -73,9 +73,14 @@ impl<'lua> Handler<'lua> {
             .create_function(Self::load_plugin_and_stop_handlers)?
             .bind((plugin_id.clone(), plugin_loader.clone()))?;
 
-        self.start.call(plugin_loader)?;
+        self.start = self.start.bind(plugin_loader)?;
 
         Ok(())
+    }
+
+    #[inline]
+    pub fn setup(&self) -> LuaResult<()> {
+        self.start.call(())
     }
 
     fn load_plugin_and_stop_handlers(
