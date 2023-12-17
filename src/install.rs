@@ -4,7 +4,7 @@ use std::{path::Path, thread, time::Duration};
 
 use mlua::prelude::*;
 
-use crate::{utils::expand_value, ui::Progress};
+use crate::{ui::Progress, utils::expand_value};
 
 pub fn installers(lua: &Lua) -> LuaResult<LuaTable<'_>> {
     let t = lua.create_table()?;
@@ -15,7 +15,7 @@ pub fn installers(lua: &Lua) -> LuaResult<LuaTable<'_>> {
 }
 
 pub fn install(installers: Vec<Installer>, concurrency: usize) -> LuaResult<()> {
-    if installers.len() == 0 {
+    if installers.is_empty() {
         return Ok(());
     }
 
@@ -23,20 +23,21 @@ pub fn install(installers: Vec<Installer>, concurrency: usize) -> LuaResult<()> 
     let mut workings = Vec::with_capacity(concurrency);
 
     loop {
-        match (installers.next(), workings.len()) {
-            (None, 0) => break,
-            (Some(installer), workings_count) if workings_count < concurrency => {
+        let workings_count = workings.len();
+        if workings_count < concurrency {
+            if let Some(installer) = installers.next() {
                 installer.install()?;
                 workings.push(installer);
-            }
-            _ => (),
-        }
-        for (i, installer) in workings.clone().iter().enumerate() {
-            let progress = installer.progress()?;
-            if progress.is_finished {
-                workings.swap_remove(i);
+            } else {
+                if workings_count == 0 {
+                    break;
+                }
             }
         }
+        workings.retain(|installer| match installer.progress() {
+            Ok(progress) => !progress.is_finished,
+            Err(_) => true,
+        });
 
         thread::sleep(Duration::from_millis(60));
     }
