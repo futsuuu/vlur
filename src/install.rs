@@ -28,10 +28,8 @@ pub fn install(installers: Vec<Installer>, concurrency: usize) -> LuaResult<()> 
             if let Some(installer) = installers.next() {
                 installer.install()?;
                 workings.push(installer);
-            } else {
-                if workings_count == 0 {
-                    break;
-                }
+            } else if workings_count == 0 {
+                break;
             }
         }
         workings.retain(|installer| match installer.progress() {
