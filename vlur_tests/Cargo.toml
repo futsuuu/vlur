@@ -1,0 +1,10 @@
+[package]
+name = "vlur_tests"
+version.workspace = true
+edition.workspace = true
+
+[[test]]
+name = "vlur_tests"
+path = "entry_point.rs"
+
+[dependencies]

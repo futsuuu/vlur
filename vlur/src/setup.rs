@@ -46,8 +46,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
 
         for handler in lazy_handlers {
             let mut handler = handler?;
-            handler.bind(lua, id.clone(), loader.clone())?;
-            handler.setup()?;
+            handler.start(lua, id.clone(), loader.clone())?;
         }
     }
 

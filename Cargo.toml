@@ -1,6 +1,10 @@
 [workspace]
+resolver = "2"
 members = [
-    "crates/*",
+    "vlur",
+    "vlur_macros",
+    "vlur_tests",
+    "xtask",
 ]
 
 [workspace.package]
@@ -10,26 +14,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1.0.75"
 mlua = { version = "0.9.2", features = ["luajit"] }
-compiled-time.path = "crates/compiled-time"
-
-[package]
-name = "vlur"
-version.workspace = true
-edition.workspace = true
-
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-compiled-time.workspace = true
-anyhow.workspace = true
-mlua = { workspace = true, features = ["module", "macros"] }
-walkdir = "2.4.0"
-hashbrown = { version = "0.14.3", features = ["rkyv"] }
-rkyv = "0.7.42"
-
-[build-dependencies]
-anyhow.workspace = true
+vlur_macros.path = "vlur_macros"
 
 [profile.release]
 lto = true
