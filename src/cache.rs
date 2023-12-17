@@ -5,7 +5,7 @@ use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::runtimepath::RuntimePath;
 
-const COMPILED_TIME: [u8; 16] = compiled_time::bytes!();
+const COMPILED_TIME: [u8; 16] = vlur_macros::unique_bytes!();
 
 #[derive(Default)]
 pub struct Cache {

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/*",
+    "vlur_macros",
     "xtask",
 ]
 
@@ -11,7 +11,7 @@ edition = "2021"
 [workspace.dependencies]
 anyhow = "1.0.75"
 mlua = { version = "0.9.2", features = ["luajit"] }
-compiled-time.path = "crates/compiled-time"
+vlur_macros.path = "vlur_macros"
 
 [package]
 name = "vlur"
@@ -22,7 +22,7 @@ edition.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-compiled-time.workspace = true
+vlur_macros.workspace = true
 anyhow.workspace = true
 mlua = { workspace = true, features = ["module", "macros"] }
 walkdir = "2.4.0"

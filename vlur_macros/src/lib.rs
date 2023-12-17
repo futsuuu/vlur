@@ -2,7 +2,7 @@ use proc_macro::{Delimiter, Group, Literal, Punct, Spacing, TokenStream, TokenTr
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[proc_macro]
-pub fn bytes(_: TokenStream) -> TokenStream {
+pub fn unique_bytes(_: TokenStream) -> TokenStream {
     let bytes = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
