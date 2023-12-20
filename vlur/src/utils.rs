@@ -14,7 +14,7 @@ pub fn setup_logger() -> anyhow::Result<()> {
 
 #[cfg(debug_assertions)]
 pub fn setup_logger() -> anyhow::Result<()> {
-    use std::{io::Write as _, time::{SystemTime, UNIX_EPOCH}};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     let millis = || {
         let micros = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_micros() as f64;
@@ -23,15 +23,14 @@ pub fn setup_logger() -> anyhow::Result<()> {
 
     let start = millis();
 
-    let mut stderr = std::io::stderr();
-    stderr.write_all("\n".as_bytes())?;
+    let logger = std::io::stdout();
     fern::Dispatch::new()
         .format(move |out, msg, rec| {
             let ms = millis() - start;
             out.finish(format_args!("{: >9.2} [{} {}] {}", ms, rec.level(), rec.target(), msg))
         })
         .level(log::LevelFilter::max())
-        .chain(stderr)
+        .chain(logger)
         .apply()?;
     Ok(())
 }

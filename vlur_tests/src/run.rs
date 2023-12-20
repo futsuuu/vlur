@@ -1,7 +1,9 @@
 use std::{
     fs,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
+    thread,
 };
 
 use StartupOption::*;
@@ -32,7 +34,33 @@ pub fn run(vimrc: &str, recreate_sandbox: bool, opts: &[StartupOption]) {
         };
     }
 
-    let status = command.status().unwrap();
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = command.spawn().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut line = String::new();
+        while let Ok(n) = reader.read_line(&mut line) {
+            if n == 0 {
+                break;
+            }
+            print!("{line}");
+            line.clear();
+        }
+    });
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stderr);
+        let mut line = String::new();
+        while let Ok(n) = reader.read_line(&mut line) {
+            if n == 0 {
+                break;
+            }
+            eprint!("{line}");
+            line.clear();
+        }
+    });
+    let status = child.wait().unwrap();
     assert!(status.success());
 }
 
