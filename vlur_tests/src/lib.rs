@@ -8,6 +8,10 @@ pub fn test(vimrc: &str) {
     run(vimrc, true, &[Headless, SetRtp, QuitWithCode]);
 }
 
+pub fn test_cache(vimrc: &str) {
+    run(vimrc, false, &[Headless, SetRtp, QuitWithCode]);
+}
+
 pub fn bench(vimrc: &str) {
     let count = 70;
     let warmup = 30;
@@ -23,7 +27,7 @@ pub fn bench(vimrc: &str) {
     }
 
     let results: Vec<f32> = logs[warmup..]
-        .into_iter()
+        .iter()
         .map(|log| {
             log.lines()
                 .last()
@@ -38,7 +42,7 @@ pub fn bench(vimrc: &str) {
     println!(
         "mean: {mean}\t min: {min}\t max: {max}",
         mean = results.iter().sum::<f32>() / count as f32,
-        min = results.iter().fold(0.0 / 0.0, |m, v| v.min(m)),
-        max = results.iter().fold(0.0, |m, v| v.max(m)),
+        min = results.iter().fold(f32::NAN, |m, v| v.min(m)),
+        max = results.iter().fold(f32::NAN, |m, v| v.max(m)),
     );
 }
