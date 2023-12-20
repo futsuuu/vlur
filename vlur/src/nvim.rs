@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf};
 
-use mlua::prelude::*;
-use mlua::ChunkMode;
+use log::trace;
+use mlua::{prelude::*, ChunkMode};
 
 use crate::utils::expand_value;
 
@@ -43,6 +43,7 @@ macro_rules! cache {
 
 impl<'lua> Nvim<'lua> {
     pub fn new(lua: &'lua Lua) -> LuaResult<Nvim<'lua>> {
+        trace!("load Neovim APIs");
         let loader = lua.create_function(|lua, ()| {
             lua.load(&include_bytes!(concat!(env!("OUT_DIR"), "/nvim.luac"))[..])
                 .set_mode(ChunkMode::Binary)

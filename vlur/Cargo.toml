@@ -13,6 +13,8 @@ mlua = { workspace = true, features = ["module", "macros"] }
 walkdir = "2.4.0"
 hashbrown = { version = "0.14.3", features = ["rkyv"] }
 rkyv = "0.7.42"
+log = "0.4.20"
+fern = "0.6.2"
 
 [build-dependencies]
 anyhow.workspace = true

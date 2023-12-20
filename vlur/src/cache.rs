@@ -1,5 +1,6 @@
 use std::{fs, path::Path};
 
+use log::trace;
 use hashbrown::HashMap;
 use rkyv::{Archive, Deserialize, Serialize};
 
@@ -15,6 +16,7 @@ pub struct Cache {
 
 impl Cache {
     pub fn read(path: &Path) -> anyhow::Result<Self> {
+        trace!("restore the cache");
         let bytes = fs::read(path)?;
         let inner: Inner = unsafe { rkyv::from_bytes_unchecked(&bytes)? };
         Ok(Self {

@@ -1,6 +1,7 @@
 use std::path::{self, Path};
 
 use mlua::prelude::*;
+use log::trace;
 use rkyv::{Archive, Deserialize, Serialize};
 use walkdir::WalkDir;
 
@@ -24,6 +25,7 @@ pub struct RuntimePath {
 
 impl RuntimePath {
     pub fn new(rtp: &str) -> Self {
+        trace!("parse &runtimepath");
         let mut path_len = 0;
         for p in rtp.split(OPT_SEP) {
             if p.ends_with("/after") || p.ends_with("\\after") {

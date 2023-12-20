@@ -1,8 +1,12 @@
 use vlur_tests::test;
 
 #[test]
+fn setup() {
+    test("tests/setup.lua");
+}
+
+#[test]
 fn default_plugins() {
-    test("tests/load_default_plugins.lua");
     test("tests/disable_default_plugins.lua");
 }
 

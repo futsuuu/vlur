@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use log::trace;
 use mlua::prelude::*;
 
 use crate::{
@@ -11,6 +12,8 @@ use crate::{
 };
 
 pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()> {
+    trace!("start");
+
     let mut nvim = Nvim::new(lua)?;
     let cache_file = nvim.cache_dir()?.join("cache");
 
@@ -22,6 +25,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
 
     let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
 
+    trace!("read plugins");
     let mut installers = Vec::new();
     let plugins = plugins
         .pairs::<LuaString, Plugin>()
@@ -34,8 +38,10 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             plugins
         });
 
+    trace!("install plugins");
     install(installers, 5)?;
 
+    trace!("load plugins");
     for (id, plugin) in plugins {
         let Some(lazy_handlers) = plugin.get_lazy_handlers() else {
             plugin.add_to_rtp(&mut global_rtp, &mut cache);
@@ -50,6 +56,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         }
     }
 
+    trace!("load the &packpath");
     global_rtp += get_rtp_in_packpath(&mut nvim, &mut cache)?;
 
     // Current `&runtimepath`:
@@ -67,6 +74,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     let vimruntime = nvim::vimruntime();
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
 
+    trace!("load the &runtimepath");
     for dir in &global_rtp {
         let path = Path::new(dir);
         let plugins_filter = if path.starts_with(&vimruntime) {
@@ -89,7 +97,10 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         load_files(&mut nvim, files.as_slice(), plugins_filter)?;
     }
 
+    trace!("update the cache");
     cache.update(&cache_file).ok();
+
+    trace!("finish setup");
 
     Ok(())
 }
