@@ -1,54 +1,66 @@
 use std::path::{self, Path};
 
-use mlua::prelude::*;
 use log::trace;
+use mlua::prelude::*;
 use rkyv::{Archive, Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::nvim::OPT_SEP;
 
+const OPT_SEP_LEN: usize = 1;
+
 /// A structure to manage `&runtimepath`.
-///
-/// Usually `after_path` starts with the separator.
 ///
 /// ```text
 /// &rtp = /foo/bar , /baz/foobar , /foo/bar/after , /baz/foobar/after
-///       |______________________|____________________________________|
-///        path                   after_path
+///                              ^
+///                             `split_pos` is just before the `OPT_SEP`
 /// ```
 #[derive(Archive, Deserialize, Serialize, Clone, Default)]
 #[archive()]
 pub struct RuntimePath {
-    path: String,
-    after_path: String,
+    rtp: String,
+    split_pos: usize,
 }
 
 impl RuntimePath {
-    pub fn new(rtp: &str) -> Self {
+    fn new(rtp: &str) -> Self {
         trace!("parse &runtimepath");
-        let mut path_len = 0;
-        for p in rtp.split(OPT_SEP) {
-            if p.ends_with("/after") || p.ends_with("\\after") {
+        debug_assert_eq!(OPT_SEP.len_utf8(), OPT_SEP_LEN);
+
+        let mut split_pos = 0;
+        for path in rtp.split(OPT_SEP) {
+            if path.ends_with("/after") || path.ends_with("\\after") {
                 break;
             }
-            path_len += p.len() + 1;
+            split_pos += path.len() + OPT_SEP_LEN;
         }
-        path_len = path_len.saturating_sub(1);
+        split_pos = split_pos.saturating_sub(OPT_SEP_LEN);
 
-        let (path, after_path) = rtp.split_at(path_len);
         Self {
-            path: path.to_string(),
-            after_path: after_path.to_string(),
+            rtp: rtp.to_string(),
+            split_pos,
         }
     }
 
     pub fn push(&mut self, path: &str, after: bool) {
+        if path.is_empty() {
+            return;
+        }
+        if self.rtp.is_empty() {
+            self.rtp = path.to_string();
+            if !after {
+                self.split_pos = path.len();
+            }
+            return;
+        }
         if after {
-            self.after_path.push(OPT_SEP);
-            self.after_path.push_str(path);
+            self.rtp.push(OPT_SEP);
+            self.rtp.push_str(path);
         } else {
-            self.path.push(OPT_SEP);
-            self.path.push_str(path);
+            self.rtp.insert(0, OPT_SEP);
+            self.rtp.insert_str(0, path);
+            self.split_pos += path.len() + OPT_SEP_LEN;
         }
     }
 
@@ -122,31 +134,34 @@ impl RuntimePath {
     }
 }
 
-impl std::fmt::Display for RuntimePath {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.path)?;
-        f.write_str(&self.after_path)?;
-        Ok(())
-    }
-}
-
 impl std::ops::AddAssign<&RuntimePath> for RuntimePath {
     fn add_assign(&mut self, other: &Self) {
-        self.path.push(OPT_SEP);
-        self.path.push_str(&other.path);
-        self.after_path.push_str(&other.after_path);
+        let len = other.rtp.len();
+        if len == 0 {
+            return;
+        }
+        if len == other.split_pos {
+            self.rtp.insert(0, OPT_SEP);
+            self.rtp.insert_str(0, &other.rtp);
+
+            self.split_pos += len + OPT_SEP_LEN;
+        } else {
+            let (paths, after_paths) = other.rtp.split_at(other.split_pos + OPT_SEP_LEN);
+            self.rtp.insert_str(0, paths);
+            self.rtp.push(OPT_SEP);
+            self.rtp.push_str(after_paths);
+
+            self.split_pos += other.split_pos + OPT_SEP_LEN;
+        }
     }
 }
 
 impl<'a> IntoIterator for &'a RuntimePath {
     type Item = &'a str;
-    type IntoIter =
-        std::iter::Chain<std::str::Split<'a, char>, std::str::Split<'a, char>>;
+    type IntoIter = std::str::Split<'a, char>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let path = self.path.as_str().split(OPT_SEP);
-        let after_path = self.after_path.as_str().split(OPT_SEP);
-        path.chain(after_path)
+        self.rtp.as_str().split(OPT_SEP)
     }
 }
 
@@ -156,7 +171,7 @@ impl<'lua> FromLua<'lua> for RuntimePath {
             return Err(mlua::Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: "string",
-                message: Some("runtimepath".into()),
+                message: Some("&runtimepath".into()),
             });
         };
         let rtp = lua_string.to_str()?;
@@ -166,7 +181,7 @@ impl<'lua> FromLua<'lua> for RuntimePath {
 
 impl<'a, 'lua> IntoLua<'lua> for &'a RuntimePath {
     fn into_lua(self, lua: &'lua Lua) -> mlua::Result<mlua::Value<'lua>> {
-        self.to_string().into_lua(lua)
+        self.rtp.as_str().into_lua(lua)
     }
 }
 
@@ -229,26 +244,19 @@ mod tests {
     fn new() {
         let rtp =
             RuntimePath::new("/foo/bar,/baz/foobar,/foo/bar/after,/baz/foobar/after");
-        assert_eq!(
-            rtp.to_string().as_str(),
-            "/foo/bar,/baz/foobar,/foo/bar/after,/baz/foobar/after"
-        );
-        assert_eq!(rtp.path.as_str(), "/foo/bar,/baz/foobar");
-        assert_eq!(rtp.after_path.as_str(), ",/foo/bar/after,/baz/foobar/after");
+        assert_eq!(rtp.split_pos, 20);
     }
 
     #[test]
     fn new_without_after() {
         let rtp = RuntimePath::new("/foo/bar,/baz/foobar");
-        assert_eq!(rtp.path.as_str(), "/foo/bar,/baz/foobar");
-        assert_eq!(rtp.after_path.as_str(), "");
+        assert_eq!(rtp.split_pos, 20);
     }
 
     #[test]
     fn new_only_after() {
         let rtp = RuntimePath::new("/foo/bar/after,/baz/foobar/after");
-        assert_eq!(rtp.path.as_str(), "");
-        assert_eq!(rtp.after_path.as_str(), "/foo/bar/after,/baz/foobar/after");
+        assert_eq!(rtp.split_pos, 0);
     }
 
     #[test]
@@ -270,23 +278,42 @@ mod tests {
     #[test]
     fn push() {
         let mut rtp = RuntimePath::new("/foo/bar,/foo/bar/after");
+        assert_eq!(rtp.split_pos, 8);
         rtp.push("/baz", false);
         rtp.push("/baz/after", true);
-        assert_eq!(
-            rtp.to_string().as_str(),
-            "/foo/bar,/baz,/foo/bar/after,/baz/after"
-        );
+        assert_eq!(rtp.rtp.as_str(), "/baz,/foo/bar,/foo/bar/after,/baz/after");
+        assert_eq!(rtp.split_pos, 13);
+
+        let mut rtp = RuntimePath::new("");
+        rtp.push("/baz", false);
+        assert_eq!(rtp.rtp, "/baz");
+        assert_eq!(rtp.split_pos, 4);
+
+        let mut rtp = RuntimePath::new("");
+        rtp.push("/baz/after", true);
+        assert_eq!(rtp.rtp, "/baz/after");
+        assert_eq!(rtp.split_pos, 0);
     }
 
     #[test]
     fn add_assign() {
         let mut rtp = RuntimePath::new("/foo/bar,/foo/bar/after");
+        assert_eq!(rtp.split_pos, 8);
+
+        let other = RuntimePath::new("/path");
+        assert_eq!(other.split_pos, 5);
+        rtp += &other;
+        assert_eq!(rtp.rtp.as_str(), "/path,/foo/bar,/foo/bar/after");
+        assert_eq!(rtp.split_pos, 14);
+
         let other = RuntimePath::new("/baz,/baz/after");
+        assert_eq!(other.split_pos, 4);
         rtp += &other;
         assert_eq!(
-            rtp.to_string().as_str(),
-            "/foo/bar,/baz,/foo/bar/after,/baz/after"
+            rtp.rtp.as_str(),
+            "/baz,/path,/foo/bar,/foo/bar/after,/baz/after"
         );
+        assert_eq!(rtp.split_pos, 19);
     }
 
     #[cfg(windows)]
