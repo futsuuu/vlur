@@ -4,7 +4,7 @@ use mlua::prelude::*;
 use walkdir::WalkDir;
 
 use crate::{
-    cache, install::Installer, lazy::Handler as LazyHandler, nvim::Nvim,
+    cache, install::Installer, lazy::Handler as LazyHandler, nvim,
     runtimepath::RuntimePath, utils::expand_value,
 };
 
@@ -74,15 +74,13 @@ impl<'lua> Plugin<'lua> {
         let path = self.path.clone();
 
         let loader = move |lua, _: ()| {
-            let mut nvim = Nvim::new(lua)?;
-
-            let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
+            let mut global_rtp: RuntimePath = nvim::get_opt(lua, "runtimepath")?;
             global_rtp += &get_rtp(&path);
-            nvim.set_opt("runtimepath", &global_rtp)?;
+            nvim::set_opt(lua, "runtimepath", &global_rtp)?;
 
             let mut files = get_plugin_files(&path);
             files.extend(get_ftdetect_files(&path));
-            load_files(&mut nvim, &files, None)?;
+            load_files(lua, &files, None)?;
 
             Ok(())
         };
@@ -107,7 +105,7 @@ fn get_rtp(path: &Path) -> RuntimePath {
 }
 
 pub fn load_files(
-    nvim: &mut Nvim,
+    lua: &Lua,
     files: &[cache::File],
     filter: Option<&LuaTable>,
 ) -> LuaResult<()> {
@@ -126,7 +124,7 @@ pub fn load_files(
         }
     }
 
-    nvim.exec(load_script)?;
+    nvim::exec(lua, load_script)?;
 
     Ok(())
 }

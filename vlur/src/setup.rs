@@ -6,7 +6,7 @@ use mlua::prelude::*;
 use crate::{
     cache::Cache,
     install::install,
-    nvim::{self, Nvim},
+    nvim,
     plugin::{get_plugin_files, load_files, Plugin},
     runtimepath::RuntimePath,
 };
@@ -14,16 +14,15 @@ use crate::{
 pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()> {
     trace!("start");
 
-    let mut nvim = Nvim::new(lua)?;
-    let cache_file = nvim.cache_dir()?.join("cache");
+    let cache_file = nvim::cache_dir(lua)?.join("cache");
 
     // :set noloadplugins
-    nvim.set_opt("loadplugins", false)?;
+    nvim::set_opt(lua, "loadplugins", false)?;
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
     let mut cache = Cache::read(&cache_file).unwrap_or_default();
 
-    let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
+    let mut global_rtp: RuntimePath = nvim::get_opt(lua, "runtimepath")?;
 
     trace!("read plugins");
     let mut installers = Vec::new();
@@ -57,7 +56,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     }
 
     trace!("load the &packpath");
-    global_rtp += get_rtp_in_packpath(&mut nvim, &mut cache)?;
+    global_rtp += get_rtp_in_packpath(lua, &mut cache)?;
 
     // Current `&runtimepath`:
     //
@@ -69,7 +68,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     // 6. after plugins in start packages
 
     // Update `&runtimepath`.
-    nvim.set_opt("runtimepath", &global_rtp)?;
+    nvim::set_opt(lua, "runtimepath", &global_rtp)?;
 
     let vimruntime = nvim::vimruntime();
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
@@ -94,7 +93,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             cache.inner.plugins.get(dir).unwrap()
         };
 
-        load_files(&mut nvim, files.as_slice(), plugins_filter)?;
+        load_files(lua, files.as_slice(), plugins_filter)?;
     }
 
     trace!("update the cache");
@@ -106,10 +105,10 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
 }
 
 fn get_rtp_in_packpath<'a>(
-    nvim: &mut Nvim,
+    lua: &Lua,
     cache: &'a mut Cache,
 ) -> LuaResult<&'a RuntimePath> {
-    let packpath: String = nvim.get_opt("packpath")?;
+    let packpath: String = nvim::get_opt(lua, "packpath")?;
 
     if !cache.is_valid || cache.inner.package.packpath != packpath {
         let mut rtp = RuntimePath::default();

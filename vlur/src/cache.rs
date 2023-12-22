@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
-use log::trace;
 use hashbrown::HashMap;
+use log::trace;
 use rkyv::{Archive, Deserialize, Serialize};
 
 use crate::runtimepath::RuntimePath;

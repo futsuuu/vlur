@@ -5,130 +5,123 @@ use mlua::{prelude::*, ChunkMode};
 
 use crate::utils::expand_value;
 
+const REGISTRY_KEY: &str = concat!(env!("CARGO_PKG_NAME"), ".nvim_api");
 /// Separator character used for Neovim options.
 pub const OPT_SEP: char = ',';
+
+#[inline]
+fn load_from_lua<'lua, R: FromLua<'lua>>(lua: &'lua Lua, name: &str) -> LuaResult<R> {
+    if let Ok(t) = lua.named_registry_value::<LuaTable>(REGISTRY_KEY) {
+        return t.raw_get(name);
+    }
+    trace!("load Neovim APIs");
+    let t = lua
+        .load(&include_bytes!(concat!(env!("OUT_DIR"), "/nvim.luac"))[..])
+        .set_mode(ChunkMode::Binary)
+        .eval::<LuaTable>()?;
+    let r = t.raw_get(name);
+    lua.set_named_registry_value(REGISTRY_KEY, t)?;
+    r
+}
+
+macro_rules! nvim {
+    ($lua:ident . $name:ident : $ty:ty) => {
+        self::load_from_lua::<$ty>($lua, stringify!($name))
+    };
+    ($lua:ident . $name:ident ( $a:expr ) -> $ty:ty) => {{
+        let f = nvim!($lua . $name : ::mlua::Function);
+        let r = f.and_then(|f| f.call::<_, $ty>($a));
+        r
+    }};
+    ($lua:ident . $name:ident ( $( $a:expr ),+ $(,)? ) -> $ty:ty) => {{
+        let f = nvim!($lua . $name : ::mlua::Function);
+        let r = f.and_then(|f| f.call::<_, $ty>(( $($a,)+ )));
+        r
+    }};
+    ($lua:ident . $name:ident ( $a:expr )) => {
+        nvim!($lua . $name ($a) -> ())
+    };
+    ($lua:ident . $name:ident ( $( $a:expr ),+ $(,)? )) => {
+        nvim!($lua . $name ( $($a,)+ ) -> ())
+    };
+}
 
 pub fn vimruntime() -> PathBuf {
     let var = env::var_os("VIMRUNTIME").unwrap();
     PathBuf::from(var)
 }
 
-pub struct Nvim<'lua> {
+pub fn set_opt<'lua, A>(lua: &'lua Lua, name: &str, value: A) -> LuaResult<()>
+where
+    A: IntoLuaMulti<'lua>,
+{
+    nvim!(lua.set_opt(name, value))
+}
+
+pub fn get_opt<'lua, R>(lua: &'lua Lua, name: &str) -> LuaResult<R>
+where
+    R: FromLuaMulti<'lua>,
+{
+    nvim!(lua.get_opt(name) -> R)
+}
+
+pub fn exec<'lua, A>(lua: &'lua Lua, script: A) -> LuaResult<()>
+where
+    A: IntoLuaMulti<'lua>,
+{
+    nvim!(lua.exec(script))
+}
+
+pub fn cache_dir(lua: &Lua) -> LuaResult<PathBuf> {
+    Ok(PathBuf::from(nvim!(lua.cache_dir: String)?))
+}
+
+pub fn create_autocmd<'lua, E, P>(
     lua: &'lua Lua,
-    raw: LuaTable<'lua>,
-    cache: Cache<'lua>,
+    event: E,
+    pattern: P,
+    callback: LuaFunction<'lua>,
+    once: bool,
+) -> LuaResult<LuaInteger>
+where
+    E: IntoLua<'lua>,
+    P: IntoLua<'lua>,
+{
+    nvim!(lua.create_autocmd(
+        event.into_lua(lua)?,
+        pattern.into_lua(lua)?,
+        callback,
+        once,
+    ) -> LuaInteger)
 }
 
-#[derive(Default)]
-struct Cache<'lua> {
-    set_opt: Option<LuaFunction<'lua>>,
-    get_opt: Option<LuaFunction<'lua>>,
-    exec: Option<LuaFunction<'lua>>,
-    cache_dir: Option<String>,
-    create_autocmd: Option<LuaFunction<'lua>>,
-    del_autocmd: Option<LuaFunction<'lua>>,
-    get_autocmds: Option<LuaFunction<'lua>>,
-    exec_autocmds: Option<LuaFunction<'lua>>,
+pub fn del_autocmd(lua: &Lua, id: LuaInteger) -> LuaResult<()> {
+    nvim!(lua.del_autocmd(id))
 }
 
-macro_rules! cache {
-    ($nvim:ident . $name:ident) => {{
-        if $nvim.cache.$name.is_none() {
-            let v = $nvim.raw.raw_get(stringify!($name))?;
-            $nvim.cache.$name = Some(v);
-        }
-        $nvim.cache.$name.as_ref().unwrap()
-    }};
+pub fn get_autocmds<'lua, E>(
+    lua: &'lua Lua,
+    event: E,
+) -> LuaResult<LuaTableSequence<'lua, AutoCommand<'lua>>>
+where
+    E: IntoLua<'lua>,
+{
+    let event = event.into_lua(lua)?;
+    let table = nvim!(lua.get_autocmds(event) -> LuaTable)?;
+    Ok(table.sequence_values())
 }
 
-impl<'lua> Nvim<'lua> {
-    pub fn new(lua: &'lua Lua) -> LuaResult<Nvim<'lua>> {
-        trace!("load Neovim APIs");
-        let loader = lua.create_function(|lua, ()| {
-            lua.load(&include_bytes!(concat!(env!("OUT_DIR"), "/nvim.luac"))[..])
-                .set_mode(ChunkMode::Binary)
-                .eval::<LuaTable>()
-        })?;
-        let raw = lua.load_from_function("vlur.nvim", loader)?;
-        let r = Self {
-            lua,
-            raw,
-            cache: Cache::default(),
-        };
-        Ok(r)
-    }
-
-    pub fn set_opt<A>(&mut self, name: &str, value: A) -> LuaResult<()>
-    where
-        A: IntoLuaMulti<'lua>,
-    {
-        cache!(self.set_opt).call((name, value))
-    }
-
-    pub fn get_opt<R>(&mut self, name: &str) -> LuaResult<R>
-    where
-        R: FromLuaMulti<'lua>,
-    {
-        cache!(self.get_opt).call(name)
-    }
-
-    pub fn exec<A>(&mut self, script: A) -> LuaResult<()>
-    where
-        A: IntoLuaMulti<'lua>,
-    {
-        cache!(self.exec).call(script)
-    }
-
-    pub fn cache_dir(&mut self) -> LuaResult<PathBuf> {
-        Ok(PathBuf::from(cache!(self.cache_dir)))
-    }
-
-    pub fn create_autocmd<E, P>(
-        &mut self,
-        event: E,
-        pattern: P,
-        callback: LuaFunction<'lua>,
-        once: bool,
-    ) -> LuaResult<LuaInteger>
-    where
-        E: IntoLua<'lua>,
-        P: IntoLua<'lua>,
-    {
-        cache!(self.create_autocmd).call((
-            event.into_lua(self.lua)?,
-            pattern.into_lua(self.lua)?,
-            callback,
-            once,
-        ))
-    }
-
-    pub fn del_autocmd(&mut self, id: LuaInteger) -> LuaResult<()> {
-        cache!(self.del_autocmd).call(id)
-    }
-
-    pub fn get_autocmds<E>(
-        &mut self,
-        event: E,
-    ) -> LuaResult<LuaTableSequence<'lua, AutoCommand<'lua>>>
-    where
-        E: IntoLua<'lua>,
-    {
-        let table: LuaTable =
-            cache!(self.get_autocmds).call(event.into_lua(self.lua)?)?;
-        Ok(table.sequence_values())
-    }
-
-    pub fn exec_autocmds<E>(
-        &mut self,
-        event: E,
-        group: Option<LuaInteger>,
-        data: LuaValue,
-    ) -> LuaResult<()>
-    where
-        E: IntoLua<'lua>,
-    {
-        cache!(self.exec_autocmds).call((event.into_lua(self.lua)?, group, data))
-    }
+pub fn exec_autocmds<'lua, E>(
+    lua: &'lua Lua,
+    event: E,
+    group: Option<LuaInteger>,
+    data: LuaValue,
+) -> LuaResult<()>
+where
+    E: IntoLua<'lua>,
+{
+    let event = event.into_lua(lua)?;
+    nvim!(lua.exec_autocmds(event, group, data))
 }
 
 #[derive(PartialEq)]
