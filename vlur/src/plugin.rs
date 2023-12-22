@@ -114,6 +114,7 @@ fn get_rtp(path: &Path) -> RuntimePath {
 
 /// `{dir}/plugin/**/*.{vim,lua}`
 pub fn get_plugin_files(dir: &Path) -> Vec<cache::File> {
+    let is_default = dir == nvim::vimruntime();
     let dir = dir.join("plugin");
     if !dir.exists() {
         return Vec::new();
@@ -137,10 +138,13 @@ pub fn get_plugin_files(dir: &Path) -> Vec<cache::File> {
         };
         let path = entry.path();
         let loader = cache::FileLoader::from(path);
-        let name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .map(|s| s.to_string());
+        let name = if is_default {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        } else {
+            None
+        };
 
         r.push(cache::File { loader, name });
     }

@@ -70,7 +70,6 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     // Update `&runtimepath`.
     nvim::set_opt(lua, "runtimepath", &global_rtp)?;
 
-    let vimruntime = nvim::vimruntime();
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
     let use_filter = plugins_filter.is_some();
 
@@ -90,7 +89,6 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             cache.inner.plugins.get(dir).unwrap()
         };
 
-        let use_filter = use_filter && path.starts_with(&vimruntime);
         files
             .iter()
             .filter(|file| {
