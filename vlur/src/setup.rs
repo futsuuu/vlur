@@ -1,13 +1,13 @@
 use std::path::Path;
 
-use log::trace;
+use log::{error, trace};
 use mlua::prelude::*;
 
 use crate::{
     cache::Cache,
     install::install,
     nvim,
-    plugin::{get_plugin_files, load_files, Plugin},
+    plugin::{get_plugin_files, Plugin},
     runtimepath::RuntimePath,
 };
 
@@ -72,15 +72,12 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
 
     let vimruntime = nvim::vimruntime();
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
+    let use_filter = plugins_filter.is_some();
 
     trace!("load the &runtimepath");
     for dir in &global_rtp {
         let path = Path::new(dir);
-        let plugins_filter = if path.starts_with(&vimruntime) {
-            plugins_filter.as_ref()
-        } else {
-            None
-        };
+        let plugins_filter = plugins_filter.as_ref();
 
         let files = if let (true, Some(files)) =
             (cache.is_valid, cache.inner.plugins.get(dir))
@@ -93,7 +90,27 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             cache.inner.plugins.get(dir).unwrap()
         };
 
-        load_files(lua, files.as_slice(), plugins_filter)?;
+        let use_filter = use_filter && path.starts_with(&vimruntime);
+        files
+            .iter()
+            .filter(|file| {
+                if !use_filter {
+                    return true;
+                }
+                let Some(ref name) = &file.name else {
+                    return true;
+                };
+                let name = name.as_str();
+                if let Ok(LuaValue::Boolean(false)) = plugins_filter.unwrap().get(name) {
+                    return false;
+                }
+                true
+            })
+            .for_each(|file| {
+                if file.loader.load(lua).is_err() {
+                    error!("failed to load the file");
+                }
+            });
     }
 
     trace!("update the cache");

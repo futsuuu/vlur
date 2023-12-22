@@ -3,8 +3,7 @@ local fn = vim.fn
 
 local nvim = {}
 
-nvim.cache_dir = fn.stdpath 'cache' .. '/vlur'
-nvim.state_dir = fn.stdpath 'state' .. '/vlur'
+nvim.cache_dir = fn.stdpath 'cache'
 
 ---@param name string
 ---@return any

@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, path::{PathBuf, Path}};
 
 use log::trace;
 use mlua::{prelude::*, ChunkMode};
@@ -73,7 +73,7 @@ where
 }
 
 pub fn cache_dir(lua: &Lua) -> LuaResult<PathBuf> {
-    Ok(PathBuf::from(nvim!(lua.cache_dir: String)?))
+    Ok(Path::new(&nvim!(lua.cache_dir: String)?).join("vlur"))
 }
 
 pub fn create_autocmd<'lua, E, P>(
