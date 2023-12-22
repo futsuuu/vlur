@@ -41,5 +41,8 @@ pub fn setup_logger() -> anyhow::Result<()> {
         .level(log::LevelFilter::max())
         .chain(logger)
         .apply()?;
+
+    log::trace!("success to setup logger");
+
     Ok(())
 }

@@ -1,6 +1,7 @@
 mod cache;
 mod install;
 mod lazy;
+mod module;
 mod nvim;
 mod plugin;
 mod runtimepath;
@@ -9,20 +10,8 @@ mod ui;
 mod utils;
 
 #[mlua::lua_module]
-fn vlur(lua: &mlua::Lua) -> mlua::Result<mlua::Table> {
+fn vlur(_lua: &mlua::Lua) -> mlua::Result<module::Module> {
     utils::setup_logger().or(Err(mlua::Error::runtime("Failed to setup logger")))?;
-    log::trace!("setup logger");
 
-    let exports = lua.create_table()?;
-
-    #[cfg(debug_assertions)]
-    exports.set("debug", true)?;
-
-    exports.set("lazy", lazy::handlers(lua)?)?;
-    exports.set("install", install::installers(lua)?)?;
-    exports.set("setup", lua.create_function(setup::setup)?)?;
-
-    log::trace!("loaded the Rust module");
-
-    Ok(exports)
+    Ok(module::Module::new())
 }
