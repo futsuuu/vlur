@@ -1,27 +1,30 @@
 use std::path::Path;
 
+use log::{error, trace};
 use mlua::prelude::*;
 
 use crate::{
     cache::Cache,
     install::install,
-    nvim::{self, Nvim},
-    plugin::{get_plugin_files, load_files, Plugin},
+    nvim,
+    plugin::{get_plugin_files, Plugin},
     runtimepath::RuntimePath,
 };
 
 pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()> {
-    let mut nvim = Nvim::new(lua)?;
-    let cache_file = nvim.cache_dir()?.join("cache");
+    trace!("start");
+
+    let cache_file = nvim::cache_dir(lua)?.join("cache");
 
     // :set noloadplugins
-    nvim.set_opt("loadplugins", false)?;
+    nvim::set_opt(lua, "loadplugins", false)?;
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
     let mut cache = Cache::read(&cache_file).unwrap_or_default();
 
-    let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
+    let mut global_rtp: RuntimePath = nvim::get_opt(lua, "runtimepath")?;
 
+    trace!("read plugins");
     let mut installers = Vec::new();
     let plugins = plugins
         .pairs::<LuaString, Plugin>()
@@ -34,8 +37,10 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             plugins
         });
 
+    trace!("install plugins");
     install(installers, 5)?;
 
+    trace!("load plugins");
     for (id, plugin) in plugins {
         let Some(lazy_handlers) = plugin.get_lazy_handlers() else {
             plugin.add_to_rtp(&mut global_rtp, &mut cache);
@@ -50,7 +55,8 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         }
     }
 
-    global_rtp += get_rtp_in_packpath(&mut nvim, &mut cache)?;
+    trace!("load the &packpath");
+    global_rtp += get_rtp_in_packpath(lua, &mut cache)?;
 
     // Current `&runtimepath`:
     //
@@ -62,18 +68,15 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     // 6. after plugins in start packages
 
     // Update `&runtimepath`.
-    nvim.set_opt("runtimepath", &global_rtp)?;
+    nvim::set_opt(lua, "runtimepath", &global_rtp)?;
 
-    let vimruntime = nvim::vimruntime();
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
+    let use_filter = plugins_filter.is_some();
 
+    trace!("load the &runtimepath");
     for dir in &global_rtp {
         let path = Path::new(dir);
-        let plugins_filter = if path.starts_with(&vimruntime) {
-            plugins_filter.as_ref()
-        } else {
-            None
-        };
+        let plugins_filter = plugins_filter.as_ref();
 
         let files = if let (true, Some(files)) =
             (cache.is_valid, cache.inner.plugins.get(dir))
@@ -86,19 +89,41 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             cache.inner.plugins.get(dir).unwrap()
         };
 
-        load_files(&mut nvim, files.as_slice(), plugins_filter)?;
+        files
+            .iter()
+            .filter(|file| {
+                if !use_filter {
+                    return true;
+                }
+                let Some(ref name) = &file.name else {
+                    return true;
+                };
+                let name = name.as_str();
+                if let Ok(LuaValue::Boolean(false)) = plugins_filter.unwrap().get(name) {
+                    return false;
+                }
+                true
+            })
+            .for_each(|file| {
+                if file.loader.load(lua).is_err() {
+                    error!("failed to load the file");
+                }
+            });
     }
 
+    trace!("update the cache");
     cache.update(&cache_file).ok();
+
+    trace!("finish setup");
 
     Ok(())
 }
 
 fn get_rtp_in_packpath<'a>(
-    nvim: &mut Nvim,
+    lua: &Lua,
     cache: &'a mut Cache,
 ) -> LuaResult<&'a RuntimePath> {
-    let packpath: String = nvim.get_opt("packpath")?;
+    let packpath: String = nvim::get_opt(lua, "packpath")?;
 
     if !cache.is_valid || cache.inner.package.packpath != packpath {
         let mut rtp = RuntimePath::default();

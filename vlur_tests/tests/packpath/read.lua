@@ -1,9 +1,8 @@
 local g = vim.g
 
 local vlur = require 'vlur'
-local utils = require 'vlur.utils'
 
-vim.go.packpath = vim.fn.fnamemodify(utils.file_path(), ':h') .. '/package_root'
+vim.go.packpath = 'tests/packpath/package_root'
 
 vlur.setup()
 

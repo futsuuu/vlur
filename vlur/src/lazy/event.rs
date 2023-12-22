@@ -1,7 +1,7 @@
 use hashbrown::HashSet;
 use mlua::prelude::*;
 
-use crate::{nvim::Nvim, utils::expand_value};
+use crate::{nvim, utils::expand_value};
 
 pub struct Event {
     event: Vec<String>,
@@ -65,15 +65,13 @@ impl<'lua> Event {
         lua: &'lua Lua,
         plugin_loader: LuaFunction<'lua>,
     ) -> LuaResult<()> {
-        let mut nvim = Nvim::new(lua)?;
-
         let event = self.event.as_slice();
         let pattern = self.pattern.as_slice();
         let plugin_loader = lua
             .create_function(exec_added_autocmds)?
             .bind(plugin_loader)?;
 
-        let id = nvim.create_autocmd(event, pattern, plugin_loader, true)?;
+        let id = nvim::create_autocmd(lua, event, pattern, plugin_loader, true)?;
         self.autocmd_ids.push(id);
 
         Ok(())
@@ -84,9 +82,8 @@ impl<'lua> Event {
             return Ok(());
         }
 
-        let mut nvim = Nvim::new(lua)?;
         for id in &self.autocmd_ids {
-            nvim.del_autocmd(*id)?;
+            nvim::del_autocmd(lua, *id)?;
         }
         self.autocmd_ids.clear();
 
@@ -98,8 +95,6 @@ fn exec_added_autocmds(
     lua: &Lua,
     (plugin_loader, ev): (LuaFunction, LuaTable),
 ) -> LuaResult<()> {
-    let mut nvim = Nvim::new(lua)?;
-
     expand_value!(ev, {
         event: LuaString,
         data: LuaValue,
@@ -109,7 +104,7 @@ fn exec_added_autocmds(
     let mut exists_autocmds = Vec::new();
     let mut exists_ids = HashSet::new();
     let mut exists_groups = HashSet::new();
-    for autocmd in nvim.get_autocmds(event)? {
+    for autocmd in nvim::get_autocmds(lua, event)? {
         let autocmd = autocmd?;
         if let Some(id) = autocmd.id {
             exists_ids.insert(id);
@@ -123,7 +118,7 @@ fn exec_added_autocmds(
     plugin_loader.call(())?;
 
     let mut executed_groups = HashSet::new();
-    'autocmd: for autocmd in nvim.get_autocmds(event)? {
+    'autocmd: for autocmd in nvim::get_autocmds(lua, event)? {
         let autocmd = autocmd?;
         if let Some(id) = autocmd.id {
             if exists_ids.contains(&id) {
@@ -144,7 +139,7 @@ fn exec_added_autocmds(
                 continue 'autocmd;
             }
         }
-        nvim.exec_autocmds(event, autocmd.group, data.clone())?;
+        nvim::exec_autocmds(lua, event, autocmd.group, data.clone())?;
     }
 
     Ok(())

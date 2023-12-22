@@ -1,11 +1,13 @@
 use std::{fs, path::Path};
 
 use hashbrown::HashMap;
+use mlua::prelude::*;
+use log::trace;
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::runtimepath::RuntimePath;
+use crate::{runtimepath::RuntimePath, nvim};
 
-const COMPILED_TIME: [u8; 16] = vlur_macros::unique_bytes!();
+const CACHE_ID: [u8; 16] = vlur_macros::unique_bytes!();
 
 #[derive(Default)]
 pub struct Cache {
@@ -15,10 +17,11 @@ pub struct Cache {
 
 impl Cache {
     pub fn read(path: &Path) -> anyhow::Result<Self> {
+        trace!("restore the cache");
         let bytes = fs::read(path)?;
         let inner: Inner = unsafe { rkyv::from_bytes_unchecked(&bytes)? };
         Ok(Self {
-            is_valid: inner.built_time == COMPILED_TIME,
+            is_valid: inner.id == CACHE_ID,
             inner,
         })
     }
@@ -34,7 +37,7 @@ impl Cache {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        self.inner.built_time = COMPILED_TIME;
+        self.inner.id = CACHE_ID;
         let bytes = rkyv::to_bytes::<_, 0>(&self.inner)?;
         fs::write(path, bytes)?;
 
@@ -45,7 +48,7 @@ impl Cache {
 #[derive(Archive, Deserialize, Serialize, Default)]
 #[archive()]
 pub struct Inner {
-    pub built_time: [u8; 16],
+    pub id: [u8; 16],
 
     /// [`RuntimePath`] added by `&packpath`.
     pub package: Package,
@@ -73,7 +76,7 @@ pub struct Package {
 pub struct File {
     pub loader: FileLoader,
     /// Used to disable loading for default plugins.
-    pub stem: Option<String>,
+    pub name: Option<String>,
 }
 
 #[derive(Archive, Deserialize, Serialize)]
@@ -86,5 +89,21 @@ pub enum FileLoader {
 impl Default for FileLoader {
     fn default() -> Self {
         Self::Script("".into())
+    }
+}
+
+impl FileLoader {
+    pub fn load(&self, lua: &Lua) -> LuaResult<()> {
+        match *self {
+            FileLoader::Script(ref script) => nvim::exec(lua, script.as_str())?,
+        }
+        Ok(())
+    }
+}
+
+impl<P: AsRef<Path>> From<P> for FileLoader {
+    fn from(value: P) -> Self {
+        let path = value.as_ref();
+        Self::Script(format!("source {}\n", path.display()))
     }
 }

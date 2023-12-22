@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
 
+use log::error;
 use mlua::prelude::*;
 use walkdir::WalkDir;
 
 use crate::{
-    cache, install::Installer, lazy::Handler as LazyHandler, nvim::Nvim,
+    cache, install::Installer, lazy::Handler as LazyHandler, nvim,
     runtimepath::RuntimePath, utils::expand_value,
 };
 
@@ -74,15 +75,20 @@ impl<'lua> Plugin<'lua> {
         let path = self.path.clone();
 
         let loader = move |lua, _: ()| {
-            let mut nvim = Nvim::new(lua)?;
-
-            let mut global_rtp: RuntimePath = nvim.get_opt("runtimepath")?;
+            let mut global_rtp: RuntimePath = nvim::get_opt(lua, "runtimepath")?;
             global_rtp += &get_rtp(&path);
-            nvim.set_opt("runtimepath", &global_rtp)?;
+            nvim::set_opt(lua, "runtimepath", &global_rtp)?;
 
-            let mut files = get_plugin_files(&path);
-            files.extend(get_ftdetect_files(&path));
-            load_files(&mut nvim, &files, None)?;
+            let plugin_files = get_plugin_files(&path);
+            let ftdetect_files = get_ftdetect_files(&path);
+            plugin_files
+                .into_iter()
+                .chain(ftdetect_files)
+                .for_each(|file| {
+                    if file.loader.load(lua).is_err() {
+                        error!("failed to load the file");
+                    }
+                });
 
             Ok(())
         };
@@ -106,33 +112,9 @@ fn get_rtp(path: &Path) -> RuntimePath {
     rtp
 }
 
-pub fn load_files(
-    nvim: &mut Nvim,
-    files: &[cache::File],
-    filter: Option<&LuaTable>,
-) -> LuaResult<()> {
-    let mut load_script = String::new();
-
-    for file in files.iter() {
-        if let (Some(plugins_filter), Some(stem)) = (filter, file.stem.as_ref()) {
-            let stem = stem.as_str();
-            if let Ok(LuaValue::Boolean(false)) = plugins_filter.get::<_, LuaValue>(stem)
-            {
-                continue;
-            };
-        }
-        match &file.loader {
-            cache::FileLoader::Script(command) => load_script += &command,
-        }
-    }
-
-    nvim.exec(load_script)?;
-
-    Ok(())
-}
-
 /// `{dir}/plugin/**/*.{vim,lua}`
 pub fn get_plugin_files(dir: &Path) -> Vec<cache::File> {
+    let is_default = dir == nvim::vimruntime();
     let dir = dir.join("plugin");
     if !dir.exists() {
         return Vec::new();
@@ -155,13 +137,16 @@ pub fn get_plugin_files(dir: &Path) -> Vec<cache::File> {
             continue;
         };
         let path = entry.path();
-        let stem = path.file_stem().unwrap().to_str().unwrap().to_string();
-        let loader = cache::FileLoader::Script(format!("source {}\n", path.display()));
+        let loader = cache::FileLoader::from(path);
+        let name = if is_default {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        } else {
+            None
+        };
 
-        r.push(cache::File {
-            loader,
-            stem: Some(stem),
-        });
+        r.push(cache::File { loader, name });
     }
 
     r
@@ -192,9 +177,9 @@ pub fn get_ftdetect_files(dir: &Path) -> Vec<cache::File> {
             continue;
         };
         let path = entry.path();
-        let loader = cache::FileLoader::Script(format!("source {}\n", path.display()));
+        let loader = cache::FileLoader::from(path);
 
-        r.push(cache::File { loader, stem: None });
+        r.push(cache::File { loader, name: None });
     }
 
     r
