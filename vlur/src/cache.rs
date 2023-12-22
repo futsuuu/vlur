@@ -1,11 +1,11 @@
 use std::{fs, path::Path};
 
 use hashbrown::HashMap;
-use mlua::prelude::*;
 use log::trace;
+use mlua::prelude::*;
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{runtimepath::RuntimePath, nvim};
+use crate::{nvim, runtimepath::RuntimePath};
 
 const CACHE_ID: [u8; 16] = vlur_macros::unique_bytes!();
 
