@@ -2,6 +2,7 @@ mod git;
 
 use std::{path::Path, thread, time::Duration};
 
+use log::info;
 use mlua::prelude::*;
 
 use crate::{ui::Progress, utils::expand_value};
@@ -33,7 +34,12 @@ pub fn install(installers: Vec<Installer>, concurrency: usize) -> LuaResult<()> 
             }
         }
         workings.retain(|installer| match installer.progress() {
-            Ok(progress) => !progress.is_finished,
+            Ok(progress) => {
+                if let Some(log) = progress.log {
+                    info!("installer: {}", log);
+                }
+                !progress.is_finished
+            },
             Err(_) => true,
         });
 

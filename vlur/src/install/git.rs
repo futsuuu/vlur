@@ -1,8 +1,8 @@
 use std::{
-    io,
+    io::{self, BufRead, BufReader},
     path::PathBuf,
-    process::Command,
-    thread::{self, JoinHandle},
+    process::{Command, Stdio},
+    thread::{self, JoinHandle}, sync::mpsc::{Receiver, channel},
 };
 
 use mlua::prelude::*;
@@ -12,7 +12,12 @@ use crate::ui::Progress;
 pub struct Git {
     url: String,
     path: Option<PathBuf>,
-    thread: Option<JoinHandle<io::Result<()>>>,
+    command: Option<GitCommand>,
+}
+
+struct GitCommand {
+    thread: JoinHandle<io::Result<()>>,
+    log_receiver: Receiver<String>,
 }
 
 impl LuaUserData for Git {
@@ -29,13 +34,13 @@ impl<'lua> Git {
         Ok(Self {
             url,
             path: None,
-            thread: None,
+            command: None,
         })
     }
 
     fn setup(&mut self, path: LuaString<'lua>) -> LuaResult<bool> {
         debug_assert!(self.path.is_none());
-        debug_assert!(self.thread.is_none());
+        debug_assert!(self.command.is_none());
 
         let path = PathBuf::from(path.to_str()?.to_string());
         let result = path.exists();
@@ -45,7 +50,7 @@ impl<'lua> Git {
     }
 
     fn install(&mut self) -> LuaResult<()> {
-        if self.thread.is_some() {
+        if self.command.is_some() {
             return Ok(());
         }
 
@@ -53,24 +58,65 @@ impl<'lua> Git {
         let path = self.path.as_ref().unwrap();
         let mut cmd = Command::new("git");
         cmd.args(["clone", url]).arg(path.as_os_str());
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+        let mut child = cmd
+            .spawn()
+            .or(Err(LuaError::runtime("git command failed to start")))?;
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+
+        let (tx, rx) = channel();
+        let tx1 = tx.clone();
+
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            loop {
+                let mut line = String::new();
+                let Ok(n) = reader.read_line(&mut line) else {
+                    break;
+                };
+                if n == 0 {
+                    break;
+                }
+                tx.send(line.trim().to_string()).ok();
+            }
+        });
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            loop {
+                let mut line = String::new();
+                let Ok(n) = reader.read_line(&mut line) else {
+                    break;
+                };
+                if n == 0 {
+                    break;
+                }
+                tx1.send(line.trim().to_string()).ok();
+            }
+        });
 
         let thread = thread::spawn(move || {
-            cmd.status()?;
+            child.wait()?;
             Ok(())
         });
-        self.thread = Some(thread);
+        self.command = Some(GitCommand { thread, log_receiver: rx });
 
         Ok(())
     }
 
     fn progress(&mut self) -> LuaResult<Progress> {
-        let is_finished = match self.thread {
-            Some(ref thread) => thread.is_finished(),
-            None => true,
+        let mut progress = Progress {
+            title: String::from("git clone"),
+            log: None,
+            is_finished: true,
         };
-        if is_finished {
-            self.thread = None;
+        if let Some(ref command) = self.command {
+            progress.is_finished = command.thread.is_finished();
+            progress.log = command.log_receiver.try_iter().last();
         }
-        Ok(Progress { is_finished })
+        if progress.is_finished {
+            self.command = None;
+        }
+        Ok(progress)
     }
 }
