@@ -37,8 +37,10 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             plugins
         });
 
-    trace!("install plugins");
-    install(installers, 5)?;
+    if !installers.is_empty() {
+        trace!("install plugins");
+        install(lua, installers, 5)?;
+    }
 
     trace!("load plugins");
     for (id, plugin) in plugins {

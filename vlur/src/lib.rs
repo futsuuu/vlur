@@ -11,7 +11,6 @@ mod utils;
 
 #[mlua::lua_module]
 fn vlur(_lua: &mlua::Lua) -> mlua::Result<module::Module> {
-    utils::setup_logger().or(Err(mlua::Error::runtime("Failed to setup logger")))?;
-
-    Ok(module::Module::new())
+    let log_receiver = utils::setup_logger();
+    Ok(module::Module::new(log_receiver))
 }

@@ -16,7 +16,9 @@ local lib = (function()
 end)()
 
 ---@class vlur
-local M = setmetatable({}, {
+local M = setmetatable({
+    lib = lib,
+}, {
     __index = lib,
 })
 
@@ -24,4 +26,5 @@ function M.setup(plugins, config)
     lib.setup(plugins or {}, config or {})
 end
 
+package.loaded.vlur = M
 return M

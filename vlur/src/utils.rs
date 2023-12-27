@@ -1,3 +1,8 @@
+use std::{
+    sync::mpsc::{channel, Receiver},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 macro_rules! expand_value {
     ($gettable:expr, { $($name:ident : $ty:ty),+ $(,)? }) => (
         $(
@@ -7,15 +12,7 @@ macro_rules! expand_value {
 }
 pub(crate) use expand_value;
 
-#[cfg(not(debug_assertions))]
-pub fn setup_logger() -> anyhow::Result<()> {
-    Ok(())
-}
-
-#[cfg(debug_assertions)]
-pub fn setup_logger() -> anyhow::Result<()> {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
+pub fn setup_logger() -> Receiver<String> {
     let millis = || {
         let micros = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -26,7 +23,7 @@ pub fn setup_logger() -> anyhow::Result<()> {
 
     let start = millis();
 
-    let logger = std::io::stdout();
+    let (tx, rx) = channel();
     fern::Dispatch::new()
         .format(move |out, msg, rec| {
             let ms = millis() - start;
@@ -39,10 +36,11 @@ pub fn setup_logger() -> anyhow::Result<()> {
             ))
         })
         .level(log::LevelFilter::max())
-        .chain(logger)
-        .apply()?;
+        .chain(tx)
+        .apply()
+        .unwrap();
 
     log::trace!("success to setup logger");
 
-    Ok(())
+    rx
 }

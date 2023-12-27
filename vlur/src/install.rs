@@ -15,10 +15,16 @@ pub fn installers(lua: &Lua) -> LuaResult<LuaTable<'_>> {
     Ok(t)
 }
 
-pub fn install(installers: Vec<Installer>, concurrency: usize) -> LuaResult<()> {
-    if installers.is_empty() {
-        return Ok(());
-    }
+pub fn install(
+    lua: &Lua,
+    installers: Vec<Installer>,
+    concurrency: usize,
+) -> LuaResult<()> {
+    let ui = lua
+        .globals()
+        .get::<_, LuaFunction>("require")?
+        .call::<_, LuaTable>("vlur_ui")?;
+    ui.get::<_, LuaFunction>("open")?.call(())?;
 
     let mut installers = installers.into_iter();
     let mut workings = Vec::with_capacity(concurrency);
@@ -39,13 +45,15 @@ pub fn install(installers: Vec<Installer>, concurrency: usize) -> LuaResult<()> 
                     info!("installer: {}", log);
                 }
                 !progress.is_finished
-            },
+            }
             Err(_) => true,
         });
 
+        ui.get::<_, LuaFunction>("update")?.call(())?;
         thread::sleep(Duration::from_millis(60));
     }
 
+    ui.get::<_, LuaFunction>("hide")?.call(())?;
     Ok(())
 }
 
