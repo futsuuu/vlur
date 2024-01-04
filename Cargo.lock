@@ -706,8 +706,17 @@ dependencies = [
  "log",
  "mlua",
  "rkyv",
+ "vlur_bridge",
  "vlur_macros",
  "walkdir",
+]
+
+[[package]]
+name = "vlur_bridge"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "mlua",
 ]
 
 [[package]]

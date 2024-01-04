@@ -6,9 +6,15 @@ use std::{
 use log::trace;
 use mlua::{prelude::*, ChunkMode};
 
-use crate::utils::expand_value;
+macro_rules! expand_value {
+    ($gettable:expr, { $($name:ident : $ty:ty),+ $(,)? }) => (
+        $(
+            let $name: $ty = $gettable.get(stringify!($name))?;
+        )+
+    );
+}
 
-const REGISTRY_KEY: &str = concat!(env!("CARGO_PKG_NAME"), ".nvim_api");
+const REGISTRY_KEY: &str = env!("CARGO_PKG_NAME");
 /// Separator character used for Neovim options.
 pub const OPT_SEP: char = ',';
 

@@ -5,7 +5,7 @@ use mlua::prelude::*;
 use rkyv::{Archive, Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::nvim::OPT_SEP;
+use vlur_bridge::OPT_SEP;
 
 const OPT_SEP_LEN: usize = 1;
 

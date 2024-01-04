@@ -5,8 +5,8 @@ use mlua::prelude::*;
 use walkdir::WalkDir;
 
 use crate::{
-    cache, install::Installer, lazy::Handler as LazyHandler, nvim,
-    runtimepath::RuntimePath, utils::expand_value,
+    cache, install::Installer, lazy::Handler as LazyHandler, runtimepath::RuntimePath,
+    utils::expand_value,
 };
 
 pub struct Plugin<'lua> {
@@ -75,9 +75,9 @@ impl<'lua> Plugin<'lua> {
         let path = self.path.clone();
 
         let loader = move |lua, _: ()| {
-            let mut global_rtp: RuntimePath = nvim::get_opt(lua, "runtimepath")?;
+            let mut global_rtp: RuntimePath = vlur_bridge::get_opt(lua, "runtimepath")?;
             global_rtp += &get_rtp(&path);
-            nvim::set_opt(lua, "runtimepath", &global_rtp)?;
+            vlur_bridge::set_opt(lua, "runtimepath", &global_rtp)?;
 
             let plugin_files = get_plugin_files(&path);
             let ftdetect_files = get_ftdetect_files(&path);
@@ -114,7 +114,7 @@ fn get_rtp(path: &Path) -> RuntimePath {
 
 /// `{dir}/plugin/**/*.{vim,lua}`
 pub fn get_plugin_files(dir: &Path) -> Vec<cache::File> {
-    let is_default = dir == nvim::vimruntime();
+    let is_default = dir == vlur_bridge::vimruntime();
     let dir = dir.join("plugin");
     if !dir.exists() {
         return Vec::new();

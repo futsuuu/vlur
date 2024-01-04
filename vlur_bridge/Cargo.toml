@@ -1,0 +1,8 @@
+[package]
+name = "vlur_bridge"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+log.workspace = true
+mlua.workspace = true

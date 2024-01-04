@@ -2,7 +2,8 @@ use std::{
     io::{self, BufRead, BufReader},
     path::PathBuf,
     process::{Command, Stdio},
-    thread::{self, JoinHandle}, sync::mpsc::{Receiver, channel},
+    sync::mpsc::{channel, Receiver},
+    thread::{self, JoinHandle},
 };
 
 use mlua::prelude::*;
@@ -99,7 +100,10 @@ impl<'lua> Git {
             child.wait()?;
             Ok(())
         });
-        self.command = Some(GitCommand { thread, log_receiver: rx });
+        self.command = Some(GitCommand {
+            thread,
+            log_receiver: rx,
+        });
 
         Ok(())
     }

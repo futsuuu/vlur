@@ -6,7 +6,6 @@ use mlua::prelude::*;
 use crate::{
     cache::Cache,
     install::install,
-    nvim,
     plugin::{get_plugin_files, Plugin},
     runtimepath::RuntimePath,
 };
@@ -14,15 +13,15 @@ use crate::{
 pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()> {
     trace!("start");
 
-    let cache_file = nvim::cache_dir(lua)?.join("cache");
+    let cache_file = vlur_bridge::cache_dir(lua)?.join("cache");
 
     // :set noloadplugins
-    nvim::set_opt(lua, "loadplugins", false)?;
+    vlur_bridge::set_opt(lua, "loadplugins", false)?;
 
     // `cache.is_valid` is [`true`] if successful to read the cache, otherwise [`false`].
     let mut cache = Cache::read(&cache_file).unwrap_or_default();
 
-    let mut global_rtp: RuntimePath = nvim::get_opt(lua, "runtimepath")?;
+    let mut global_rtp: RuntimePath = vlur_bridge::get_opt(lua, "runtimepath")?;
 
     trace!("read plugins");
     let mut installers = Vec::new();
@@ -70,7 +69,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     // 6. after plugins in start packages
 
     // Update `&runtimepath`.
-    nvim::set_opt(lua, "runtimepath", &global_rtp)?;
+    vlur_bridge::set_opt(lua, "runtimepath", &global_rtp)?;
 
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
     let use_filter = plugins_filter.is_some();
@@ -125,11 +124,11 @@ fn get_rtp_in_packpath<'a>(
     lua: &Lua,
     cache: &'a mut Cache,
 ) -> LuaResult<&'a RuntimePath> {
-    let packpath: String = nvim::get_opt(lua, "packpath")?;
+    let packpath: String = vlur_bridge::get_opt(lua, "packpath")?;
 
     if !cache.is_valid || cache.inner.package.packpath != packpath {
         let mut rtp = RuntimePath::default();
-        for dir in packpath.as_str().split(nvim::OPT_SEP) {
+        for dir in packpath.as_str().split(vlur_bridge::OPT_SEP) {
             rtp.push_package(dir);
         }
         cache.is_valid = false;

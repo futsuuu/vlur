@@ -5,7 +5,7 @@ use log::trace;
 use mlua::prelude::*;
 use rkyv::{Archive, Deserialize, Serialize};
 
-use crate::{nvim, runtimepath::RuntimePath};
+use crate::runtimepath::RuntimePath;
 
 const CACHE_ID: [u8; 16] = vlur_macros::unique_bytes!();
 
@@ -95,7 +95,7 @@ impl Default for FileLoader {
 impl FileLoader {
     pub fn load(&self, lua: &Lua) -> LuaResult<()> {
         match *self {
-            FileLoader::Script(ref script) => nvim::exec(lua, script.as_str())?,
+            FileLoader::Script(ref script) => vlur_bridge::exec(lua, script.as_str())?,
         }
         Ok(())
     }

@@ -2,7 +2,6 @@ mod cache;
 mod install;
 mod lazy;
 mod module;
-mod nvim;
 mod plugin;
 mod runtimepath;
 mod setup;
