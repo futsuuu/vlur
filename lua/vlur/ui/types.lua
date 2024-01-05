@@ -1,7 +1,7 @@
 local M = {}
 
----@enum vlur_ui.State
-M.State = {
+---@enum vlur.ui.Page
+M.Page = {
     Log = 'log',
 }
 

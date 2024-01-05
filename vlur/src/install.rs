@@ -23,7 +23,7 @@ pub fn install(
     let ui = lua
         .globals()
         .get::<_, LuaFunction>("require")?
-        .call::<_, LuaTable>("vlur_ui")?;
+        .call::<_, LuaTable>("vlur.ui")?;
     ui.get::<_, LuaFunction>("open")?.call(())?;
 
     let mut installers = installers.into_iter();

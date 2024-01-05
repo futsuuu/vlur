@@ -1,12 +1,12 @@
 local api = vim.api
 
 local vlur = require 'vlur'
-local types = require 'vlur_ui.types'
+local types = require 'vlur.ui.types'
 
 local M = {}
 
----@class vlur_ui.Window
----@field state vlur_ui.State
+---@class vlur.ui.Window
+---@field page vlur.ui.Page
 ---@field buffer buffer
 ---@field window window?
 ---@field resize_required boolean
@@ -14,7 +14,7 @@ local M = {}
 M = {}
 
 function M:init()
-    self.state = types.State.Log
+    self.page = types.Page.Log
     self.buffer = api.nvim_create_buf(false, true)
     self.resize_required = false
     self.redraw_required = true
@@ -34,10 +34,10 @@ function M:init()
     return self
 end
 
----@param state? vlur_ui.State
-function M:open(state)
-    if state then
-        self.state = state
+---@param page? vlur.ui.Page
+function M:open(page)
+    if page then
+        self.page = page
     end
     self.window = api.nvim_open_win(self.buffer, true, self:config())
 
@@ -60,7 +60,7 @@ function M:update()
         api.nvim_win_set_config(self.window, self:config())
     end
 
-    if self.state == types.State.Log then
+    if self.page == types.Page.Log then
         repeat
             local log = vlur.lib:get_log()
             if log then

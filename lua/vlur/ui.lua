@@ -1,4 +1,4 @@
-local window = require 'vlur_ui.window'
+local window = require 'vlur.ui.window'
 
 local M = {}
 
