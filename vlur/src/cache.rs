@@ -31,9 +31,11 @@ impl Cache {
             return Ok(());
         }
         if path.exists() {
+            trace!("remove the invalid cache");
             fs::remove_file(path)?;
             return Ok(());
         }
+        trace!("create a new cache");
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }

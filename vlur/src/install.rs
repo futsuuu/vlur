@@ -2,7 +2,7 @@ mod git;
 
 use std::{path::Path, thread, time::Duration};
 
-use log::info;
+use log::{debug, error, info};
 use mlua::prelude::*;
 
 use crate::{ui::Progress, utils::expand_value};
@@ -17,7 +17,7 @@ pub fn installers(lua: &Lua) -> LuaResult<LuaTable<'_>> {
 
 pub fn install(
     lua: &Lua,
-    installers: Vec<Installer>,
+    installers: Vec<(LuaString, Installer)>,
     concurrency: usize,
 ) -> LuaResult<()> {
     let ui = lua
@@ -32,21 +32,30 @@ pub fn install(
     loop {
         let workings_count = workings.len();
         if workings_count < concurrency {
-            if let Some(installer) = installers.next() {
+            if let Some((id, installer)) = installers.next() {
+                info!("install {}", id.to_string_lossy());
                 installer.install()?;
-                workings.push(installer);
+                workings.push((id, installer));
             } else if workings_count == 0 {
                 break;
             }
         }
-        workings.retain(|installer| match installer.progress() {
+        workings.retain(|(id, installer)| match installer.progress() {
             Ok(progress) => {
                 if let Some(log) = progress.log {
-                    info!("installer: {}", log);
+                    debug!("{}: {} > {}", id.to_string_lossy(), progress.title, log);
                 }
-                !progress.is_finished
+                if progress.is_finished {
+                    info!("success to install {}", id.to_string_lossy());
+                    false
+                } else {
+                    true
+                }
             }
-            Err(_) => true,
+            Err(_) => {
+                error!("failed to install {}", id.to_string_lossy());
+                true
+            }
         });
 
         ui.get::<_, LuaFunction>("update")?.call(())?;

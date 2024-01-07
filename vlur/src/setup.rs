@@ -30,7 +30,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         .filter_map(|pair| pair.ok())
         .fold(Vec::new(), |mut plugins, (id, plugin)| {
             if let Some(installer) = plugin.setup_installer().unwrap_or_default() {
-                installers.push(installer.clone());
+                installers.push((id.clone(), installer.clone()));
             }
             plugins.push((id, plugin));
             plugins
@@ -41,7 +41,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         install(lua, installers, 5)?;
     }
 
-    trace!("load plugins");
+    trace!("setup plugins");
     for (id, plugin) in plugins {
         let Some(lazy_handlers) = plugin.get_lazy_handlers() else {
             plugin.add_to_rtp(&mut global_rtp, &mut cache);
@@ -56,7 +56,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
         }
     }
 
-    trace!("load the &packpath");
+    trace!("add path from &packpath to &runtimepath");
     global_rtp += get_rtp_in_packpath(lua, &mut cache)?;
 
     // Current `&runtimepath`:
@@ -74,7 +74,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
     let plugins_filter = config.get::<_, LuaTable>("default_plugins").ok();
     let use_filter = plugins_filter.is_some();
 
-    trace!("load the &runtimepath");
+    trace!("load plugin files");
     for dir in &global_rtp {
         let path = Path::new(dir);
         let plugins_filter = plugins_filter.as_ref();
@@ -112,8 +112,7 @@ pub fn setup(lua: &Lua, (plugins, config): (LuaTable, LuaTable)) -> LuaResult<()
             });
     }
 
-    trace!("update the cache");
-    cache.update(&cache_file).ok();
+    cache.update(&cache_file).into_lua_err()?;
 
     trace!("finish setup");
 
