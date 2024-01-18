@@ -5,28 +5,39 @@ local utils = require 'shikakui.utils'
 ---@field text string
 local M = setmetatable({}, { __index = Element })
 
----@param text shikakui.Primitive
 ---@return shikakui.element.Text
-function M.new(text)
-    local self = setmetatable({}, { __index = M })
+function M.new()
+    return setmetatable({}, { __index = M })
+end
+
+---@param text shikakui.Primitive
+---@param parent shikakui.Element
+function M:init(text, parent)
     self.text = tostring(text)
-    return self
+    self.parent = parent
 end
 
----@return shikakui.Size
-function M:get_min_size()
+---@return shikakui.Range
+function M:width_range()
+    return utils.Range(self.text:len())
+end
+
+---@return shikakui.Range
+function M:height_range()
+    return utils.Range(1)
+end
+
+---@param area shikakui.Area
+---@return shikakui.Area
+function M:render(area)
+    assert(area.buf, 'buffer not found')
+    utils.set_text(area.buf, area.pos, self.text)
     return {
-        width = self.text:len(),
-        height = 1,
+        win = area.win,
+        buf = area.buf,
+        pos = area.pos,
+        size = utils.Size(self.text:len(), 1),
     }
-end
-
----@param buffer buffer
----@param pos shikakui.Position
----@param _size shikakui.Size
-function M:render(buffer, pos, _size)
-    utils.set_text(buffer, pos, self.text)
-    return self:get_min_size()
 end
 
 return M

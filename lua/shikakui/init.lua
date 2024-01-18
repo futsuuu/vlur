@@ -1,4 +1,4 @@
-local api = vim.api
+local utils = require 'shikakui.utils'
 
 local M = {
     hooks = require 'shikakui.hooks',
@@ -12,18 +12,16 @@ local M = {
 ---| nil
 
 ---@alias shikakui.Node
----| shikakui.Element
+---| shikakui.ElementBuilder
 ---| shikakui.Primitive
 
----@param window window
 ---@param node shikakui.Node
-function M.render(window, node)
-    M.element
-        .from_node(node)
-        :render(api.nvim_win_get_buf(window), { line = 1, col = 1 }, {
-            width = api.nvim_win_get_width(window),
-            height = api.nvim_win_get_height(window),
-        })
+function M.render(node)
+    local root = M.element.root(nil, node)
+    root:build():render {
+        pos = utils.Pos(),
+        size = utils.Size(vim.o.columns, vim.o.lines),
+    }
 end
 
 ---@generic T: fun(...): shikakui.Node

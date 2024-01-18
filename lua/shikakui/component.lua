@@ -7,7 +7,7 @@ local M = {}
 ---@field state_idx integer
 ---@field child_fn fun(...): shikakui.Node
 ---@field args unknown[]
----@field child shikakui.Element
+---@field child shikakui.ElementBuilder
 local Component = {}
 
 ---@package
@@ -28,7 +28,7 @@ function M.new(func)
 end
 
 ---@package
----@return shikakui.Element
+---@return shikakui.ElementBuilder
 function Component:get_element(...)
     local args = { ... }
     local len = #args

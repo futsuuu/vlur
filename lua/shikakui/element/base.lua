@@ -4,21 +4,26 @@ local M = {}
 ---@diagnostic disable: unused-local, missing-return
 
 ---@package
+---@return shikakui.Element
 function M.new() end
 
----@package
----@return shikakui.Size
-function M:get_min_size()
-    ---@diagnostic disable-next-line: undefined-field
-    return self.child:get_min_size()
-end
+---@param opts any
+---@param parent shikakui.Element
+---@param ... shikakui.Element
+function M:init(opts, parent, ...) end
 
 ---@package
----@param buffer buffer
----@param pos shikakui.Position
----@param size shikakui.Size
----@return shikakui.Size
-function M:render(buffer, pos, size) end
+---@return shikakui.Range
+function M:width_range() end
+
+---@package
+---@return shikakui.Range
+function M:height_range() end
+
+---@package
+---@param area shikakui.Area
+---@return shikakui.Area
+function M:render(area) end
 
 ---@diagnostic enable
 
