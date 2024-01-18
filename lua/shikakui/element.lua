@@ -54,4 +54,12 @@ function M.floatwin(opts, child)
     return Builder.new(element, opts, to_builder(child))
 end
 
+---@param opts shikakui.element.PaddingOpts
+---@param child shikakui.Node
+---@return shikakui.ElementBuilder
+function M.padding(opts, child)
+    local element = require('shikakui.element.padding').new()
+    return Builder.new(element, opts, to_builder(child))
+end
+
 return M

@@ -2,6 +2,13 @@ local api = vim.api
 
 local M = {}
 
+---Same with `math.type`
+---@param number number
+---@return 'float'|'integer'
+function M.number_type(number)
+    return number == math.floor(number) and 'integer' or 'float'
+end
+
 ---@class shikakui.Area
 ---@field win? window
 ---@field buf? buffer
@@ -9,9 +16,9 @@ local M = {}
 ---@field size shikakui.Size
 
 ---@class shikakui.Range
----@field min number
----@field max number
----@overload fun(min: number, max?: number): shikakui.Range
+---@field min integer
+---@field max integer
+---@overload fun(min: integer, max?: integer): shikakui.Range
 M.Range = setmetatable({}, {
     __call = function(_, min, max)
         local self = {
@@ -46,6 +53,7 @@ function M.Size:set_width(width)
     else
         self.width = width.width
     end
+    return self
 end
 
 ---@param width integer|{ width: integer }
@@ -55,6 +63,7 @@ function M.Size:add_width(width)
     else
         self:set_width(self.width + width.width)
     end
+    return self
 end
 
 ---@param height integer|{ height: integer }
@@ -64,6 +73,7 @@ function M.Size:set_height(height)
     else
         self.height = height.height
     end
+    return self
 end
 
 ---@param height integer|{ height: integer }
@@ -73,6 +83,7 @@ function M.Size:add_height(height)
     else
         self:set_height(self.height + height.height)
     end
+    return self
 end
 
 ---Default value: (1, 1)
@@ -89,6 +100,46 @@ M.Pos = setmetatable({}, {
         return setmetatable(self, { __index = M.Pos })
     end,
 })
+
+---@param x integer|{ x: integer }
+function M.Pos:set_x(x)
+    if type(x) == 'number' then
+        self.x = x
+    else
+        self.x = x.x
+    end
+    return self
+end
+
+---@param x integer|{ x: integer }
+function M.Pos:add_x(x)
+    if type(x) == 'number' then
+        self:set_x(self.x + x)
+    else
+        self:set_x(self.x + x.x)
+    end
+    return self
+end
+
+---@param y integer|{ y: integer }
+function M.Pos:set_y(y)
+    if type(y) == 'number' then
+        self.y = y
+    else
+        self.y = y.y
+    end
+    return self
+end
+
+---@param y integer|{ y: integer }
+function M.Pos:add_y(y)
+    if type(y) == 'number' then
+        self:set_y(self.y + y)
+    else
+        self:set_y(self.y + y.y)
+    end
+    return self
+end
 
 local function line_len(buffer, ln)
     return api.nvim_buf_get_lines(buffer, ln - 1, ln, true)[1]:len() + 1
