@@ -2,11 +2,37 @@ local api = vim.api
 
 local M = {}
 
----Same with `math.type`
+M.num = {}
+
 ---@param number number
 ---@return 'float'|'integer'
-function M.number_type(number)
+function M.num.type(number)
     return number == math.floor(number) and 'integer' or 'float'
+end
+
+---@param number number
+---@return integer
+function M.num.round(number)
+    local i = math.floor(number)
+    if number - i > 0.5 then
+        return i + 1
+    else
+        return i
+    end
+end
+
+---@param min number
+---@param number number
+---@param max number
+---@return number
+function M.num.clamp(min, number, max)
+    if number < min then
+        return min
+    end
+    if number > max then
+        return max
+    end
+    return number
 end
 
 ---@class shikakui.Area
@@ -141,8 +167,16 @@ function M.Pos:add_y(y)
     return self
 end
 
+---@param buffer buffer
+---@param ln integer
+---@return integer
 local function line_len(buffer, ln)
-    return api.nvim_buf_get_lines(buffer, ln - 1, ln, true)[1]:len() + 1
+    local line = api.nvim_buf_get_lines(buffer, ln - 1, ln, true)[1]
+    if line then
+        return line:len() + 1
+    else
+        return 1
+    end
 end
 
 ---@param buffer buffer

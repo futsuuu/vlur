@@ -46,22 +46,38 @@ end
 ---@param area shikakui.Area
 ---@return shikakui.Area
 function M:render(area)
-    ---@type shikakui.element.PaddingOpts
+    local round = utils.num.round
+
+    ---@type { right: integer, left: integer, top: integer, bottom: integer }
     local opts = {}
     for key, n in pairs(self.opts) do
-        if utils.number_type(n) == 'integer' then
+        if utils.num.type(n) == 'integer' then
             opts[key] = n
+        elseif key == 'right' or key == 'left' then
+            opts[key] = round(n * area.size.width)
         else
-            if key == 'right' or key == 'left' then
-                opts[key] = math.floor(area.size.width * n)
-            else
-                opts[key] = math.floor(area.size.height * n)
-            end
+            opts[key] = round(n * area.size.height)
         end
     end
+
     area = vim.deepcopy(area)
-    area.pos:set_x(opts.left):set_y(opts.top)
-    area.size:add_width(-opts.right - opts.left):add_height(-opts.top - opts.bottom)
+
+    local min_width = self.child:width_range().min
+    local right_left = opts.right + opts.left
+    local width_rate = (area.size.width - min_width) / right_left
+
+    width_rate = utils.num.clamp(0, width_rate, 1)
+    area.pos:add_x(round(opts.left * width_rate))
+    area.size:add_width(round(-right_left * width_rate))
+
+    local min_height = self.child:height_range().min
+    local top_bottom = opts.top + opts.bottom
+    local height_rate = (area.size.height - min_height) / top_bottom
+
+    height_rate = utils.num.clamp(0, height_rate, 1)
+    area.pos:add_y(round(opts.top * height_rate))
+    area.size:add_height(round(-top_bottom * height_rate))
+
     self.child:render(area)
     return area
 end
