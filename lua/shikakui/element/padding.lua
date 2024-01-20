@@ -2,7 +2,7 @@ local Element = require 'shikakui.element.base'
 local utils = require 'shikakui.utils'
 
 ---@class shikakui.element.Padding: shikakui.Element
----@field opts shikakui.element.PaddingOpts
+---@field opts { right: number, left: number, top: number, bottom: number }
 local M = setmetatable({}, { __index = Element })
 
 function M.new()
@@ -17,30 +17,77 @@ end
 ---@field left? number
 ---@field top? number
 ---@field bottom? number
-local default_opts = {
-    right = 0,
-    left = 0,
-    top = 0,
-    bottom = 0,
-}
 
 ---@param opts shikakui.element.PaddingOpts
 ---@param parent shikakui.Element
 ---@param child shikakui.Element
 function M:init(opts, parent, child)
-    self.opts = vim.tbl_extend('keep', opts, {
-        right = opts.horizontal,
-        left = opts.horizontal,
-        top = opts.vertical,
-        bottom = opts.vertical,
-    }, {
-        right = opts.all,
-        left = opts.all,
-        top = opts.all,
-        bottom = opts.all,
-    }, default_opts)
+    -- stylua: ignore
+    self.opts = {
+        right  = opts.right  or opts.horizontal or opts.all or 0,
+        left   = opts.left   or opts.horizontal or opts.all or 0,
+        top    = opts.top    or opts.vertical   or opts.all or 0,
+        bottom = opts.bottom or opts.vertical   or opts.all or 0,
+    }
     self.parent = parent
     self.child = child
+end
+
+---@return shikakui.Range
+function M:width_range()
+    local child = self.child:width_range()
+    local static = 0
+    local dynamic = 0.0
+    for _, n in ipairs { self.opts.right, self.opts.left } do
+        if utils.num.type(n) == 'integer' then
+            static = static + n
+        else
+            dynamic = dynamic + n
+        end
+    end
+
+    if dynamic == 0 then
+        return utils.Range(child.min + static, child.max + static)
+    end
+
+    static = static + child.min
+    if dynamic > 1 then
+        return utils.Range(static, math.huge)
+    end
+
+    --                 width
+    -- |---------------------|--------------|
+    --         static         dynamic * width
+    --
+    -- 0 <= dynamic < 1
+    -- width : dynamic * width = 1 : dynamic
+    --
+    -- static : dynamic * width = 1 - dynamic : dynamic
+    -- dynamic * width = (static * dynamic) / (1 - dynamic)
+    -- width = (static * dynamic) / (1 - dynamic) + static
+    return utils.Range((static * dynamic) / (1 - dynamic) + static, math.huge)
+end
+
+---@return shikakui.Range
+function M:height_range()
+    local child = self.child:height_range()
+    local static = 0
+    local dynamic = 0.0
+    for _, n in ipairs { self.opts.top, self.opts.bottom } do
+        if utils.num.type(n) == 'integer' then
+            static = static + n
+        else
+            dynamic = dynamic + n
+        end
+    end
+    if dynamic == 0 then
+        return utils.Range(child.min + static, child.max + static)
+    end
+    static = static + child.min
+    if dynamic > 1 then
+        return utils.Range(static, math.huge)
+    end
+    return utils.Range((static * dynamic) / (1 - dynamic) + static, math.huge)
 end
 
 ---@param area shikakui.Area
