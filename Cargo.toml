@@ -12,8 +12,8 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-anyhow = "1.0.81"
-mlua = { version = "0.9.6", features = ["luajit"] }
+anyhow = "1.0.82"
+mlua = { version = "0.9.7", features = ["luajit"] }
 vlur_macros.path = "vlur_macros"
 
 [profile.release]
