@@ -11,9 +11,9 @@ vlur_macros.workspace = true
 anyhow.workspace = true
 mlua = { workspace = true, features = ["module", "macros"] }
 walkdir = "2.5.0"
-hashbrown = { version = "0.14.3", features = ["rkyv"] }
+hashbrown = { version = "0.14.5", features = ["rkyv"] }
 rkyv = "0.7.44"
-log = "0.4.21"
+log = "0.4.22"
 fern = "0.6.2"
 
 [build-dependencies]
